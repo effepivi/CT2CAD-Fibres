@@ -79,7 +79,7 @@ class FlyAlgorithm:
                     
                 # Select a genetic operator
                 else:
-                    genetic_operator = random.uniform(0, self.m_mutation_probability + self.m_new_blood_probability);
+                    genetic_operator = random.uniform(0, self.m_crossover_probability + self.m_mutation_probability + self.m_new_blood_probability);
                 
                     # Apply crossover
                     if genetic_operator <= self.m_crossover_probability:
