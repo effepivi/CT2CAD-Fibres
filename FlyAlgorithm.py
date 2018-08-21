@@ -52,6 +52,15 @@ class FlyAlgorithm:
     
     def evolve(self, n = 1):
     
+        # Number of individuals to be created by elitism
+        elitism_total = 0;
+        if abs(self.m_elitism_probability)>0.0001:
+            
+            # There is more than 1 individual
+            if self.getPopulationSize() > 1:
+                elitism_total = max(1, math.floor(self.m_elitism_probability * self.getPopulationSize()));
+        
+        
         # Create n new generations of offspring
         for i in range(n):
         
@@ -65,7 +74,7 @@ class FlyAlgorithm:
             for j in range(self.getPopulationSize()):
                 
                 # Apply elitism
-                if j < math.floor(self.m_elitism_probability * self.getPopulationSize()):
+                if j < elitism_total:
                     p_offspring.append(Individual(j, self.getIndividual(self.m_sort_index[self.getPopulationSize() - j - 1])));
                     
                 # Select a genetic operator
