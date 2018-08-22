@@ -500,7 +500,7 @@ try:
     
     # Get the best match for the matrix
     #best_individual_s_genes = fly_algorithm1.getBestIndividual().m_p_gene_set;
-    best_individual_s_genes = [0.5950025276684467, 0.3318795489528351, 0.6452402234617564, 0.4659340715947374, 0.34221593134373];
+    best_individual_s_genes = [0.5859774174670042, 0.3244259243528434, 0.6062948701961279, 0.46512532982794313, 0.36295507347649336];
     setGeometry1(best_individual_s_genes);
 
     g_matrix_width  = best_individual_s_genes[2] * detector_width_in_pixels * pixel_size_in_micrometer / 1.5;
