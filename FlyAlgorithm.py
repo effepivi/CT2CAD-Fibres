@@ -44,6 +44,21 @@ class FlyAlgorithm:
             self.m_p_local_fitness = [ 0.0 for i in range(n)]
             self.m_fitness_up_to_date = False;
  
+    def restart(self):
+        # Update fitnesses if needed
+        self.computePopulationFitnesses();
+        
+        # Get the ID of the best individual
+        best_individual_id = self.getBestIndividualId():
+        
+        # Replace all the individuals, but the best one, by new random individuals
+        for i in range(self.getPopulationSize()):
+            if i != best_individual_id:
+                self.m_p_population[i] = Individual(i);
+
+        # The local fitnesses are not up-to-date
+        self.m_fitness_up_to_date = False;
+
     def getNumberOfIndividuals(self):
         return (len(self.m_p_population));
      
