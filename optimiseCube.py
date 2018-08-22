@@ -136,7 +136,8 @@ def localFitnessFunction(ind_id, genes, aFlyAlgorithm):
     
        
     # Fitness based on NCC
-    ncc =  np.multiply(g_reference_sinogram, normalised_sinogram).mean();
+    #ncc =  np.multiply(g_reference_sinogram, normalised_sinogram).mean();
+    ncc =  np.multiply(g_reference_CT, normalised_CT).mean();
 
     if g_best_ncc < ncc:
         np.savetxt("sinogram_gvxr.txt", normalised_sinogram);
@@ -346,7 +347,7 @@ class SubplotAnimation(animation.TimedAnimation):
         global g_number_of_mitosis;
         
         # Create a new population
-        g_fly_algorithm.evolve()
+        g_fly_algorithm.evolveGeneration()
         g_number_of_generations += 1;
         
         # Print the best individual
