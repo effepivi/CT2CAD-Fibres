@@ -447,6 +447,12 @@ class SubplotAnimation(animation.TimedAnimation):
         self.axarr[0,3].get_yaxis().set_ticks(y_tics);
         self.axarr[1,3].get_yaxis().set_ticks(y_tics);
 
+        self.axarr[0,3].get_xaxis().set_label("Generation #");
+        self.axarr[1,3].get_xaxis().set_label("Generation #");
+
+        self.axarr[0,3].get_yaxis().set_label("%");
+        self.axarr[1,3].get_yaxis().set_label("%");
+
         # Time for a mitosis
         if not (g_number_of_generations % NUMBER_OF_GENERATIONS):
             print ("Mitosis at Generation #", g_number_of_generations)
