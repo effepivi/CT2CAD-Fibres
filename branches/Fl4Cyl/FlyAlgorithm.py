@@ -19,15 +19,40 @@ class FlyAlgorithm:
         self.m_mutation_rate = 0.05;
         self.m_new_blood_probability = 0.20;
         self.m_elitism_probability = 0.10;
-        self.m_p_global_fitness = 0;
+        self.m_global_fitness = 0;
         self.m_best_global_fitness = 0;
         self.m_p_local_fitness  = [];
         self.m_sort_index = [];
         self.m_fitness_up_to_date = True;
         self.m_global_fitness_function = 0;
-        
+        self.m_use_marginal_fitness = False;
+        self.m_use_threshold_selection = False;
+         
         Individual.m_fly_algorithm = self;
         
+    def setUseTournamentSelection(self, aFlag = True):
+        self.m_use_threshold_selection = not aFlag;
+
+    def getUseTournamentSelection(self):
+        return (not self.m_use_threshold_selection);
+
+    def setUseThresholdSelection(self, aFlag = True):
+        self.m_use_threshold_selection = aFlag;
+
+    def getUseThresholdSelection(self):
+        return (self.m_use_threshold_selection);
+
+    def setMutationProbability(self, aProbability):
+        self.m_mutation_probability = aProbability;
+    
+    def setCrossoverProbability(self, aProbability):
+        self.m_crossover_probability = aProbability;
+    
+    def setNewBloodProbability(self, aProbability):
+        self.m_new_blood_probability = aProbability;
+    
+    def setElitismProbability(self, aProbability):
+        self.m_elitism_probability = aProbability;
     
     def setGlobalFitnessFunction(self, f):
         self.m_global_fitness_function = f;
@@ -99,7 +124,7 @@ class FlyAlgorithm:
     def getPopulationSize(self):
         return (self.getNumberOfIndividuals());
     
-    def evolve(self, n = 1):
+    def evolveGeneration(self, n = 1):
     
         # Number of individuals to be created by elitism
         elitism_total = 0;
@@ -122,25 +147,36 @@ class FlyAlgorithm:
             # Populate the population of offspring
             for j in range(self.getPopulationSize()):
                 
+                has_used_elitism = False;
+
                 # Apply elitism
-                if j < elitism_total:
+                if self.m_use_marginal_fitness:
+                    if self.m_p_local_fitness[j] > 0.0:
+                        has_used_elitism = True;
+                        p_offspring.append(Individual(j, self.getIndividual(j)));
+                        #print(j, "i s good.");
+
+                elif j < elitism_total:
+                    has_used_elitism = True
                     p_offspring.append(Individual(j, self.getIndividual(self.m_sort_index[self.getPopulationSize() - j - 1])));
                     
+
+
                 # Select a genetic operator
-                else:
+                if not has_used_elitism:
                     genetic_operator = random.uniform(0, self.m_crossover_probability + self.m_mutation_probability + self.m_new_blood_probability);
                 
                     # Apply crossover
                     if genetic_operator <= self.m_crossover_probability:
-                        parent_id1 = self.tournament(True);
-                        parent_id2 = self.tournament(True);
+                        parent_id1 = self.selectIndividual(True);
+                        parent_id2 = self.selectIndividual(True);
                         child = Individual(j);
                         child.crossOver(self.getIndividual(parent_id1), self.getIndividual(parent_id2));
                         child.mutate(self.m_mutation_rate);
                         p_offspring.append(child);
                     # Apply mutation
                     elif genetic_operator <= self.m_crossover_probability + self.m_mutation_probability:
-                        parent_id = self.tournament(True);
+                        parent_id = self.selectIndividual(True);
                         child = Individual(j, self.getIndividual(parent_id));
                         child.mutate(self.m_mutation_rate);
                         p_offspring.append(child);
@@ -152,6 +188,40 @@ class FlyAlgorithm:
             self.m_p_population = copy.deepcopy(p_offspring);
             self.m_fitness_up_to_date = False;
         
+    def evolveSteadyState(self, n = 1):
+    
+        # Create n new generations of offspring
+        for i in range(n):
+        
+            # Populate the population of offspring
+            for j in range(self.getPopulationSize()):
+                
+                genetic_operator = random.uniform(0, self.m_crossover_probability + self.m_mutation_probability + self.m_new_blood_probability);
+           
+                bad_individual_id = self.selectIndividual(False);
+                #print("Bad fly: ", bad_individual_id)
+                #self.m_p_population[bad_individual_id].print();
+                # Apply crossover
+                if genetic_operator <= self.m_crossover_probability:
+                    parent_id1 = self.selectIndividual(True);
+                    parent_id2 = self.selectIndividual(True);
+                    self.m_p_population[bad_individual_id].crossOver(self.getIndividual(parent_id1), self.getIndividual(parent_id2));
+                    self.m_p_population[bad_individual_id].mutate(self.m_mutation_rate);
+                # Apply mutation
+                elif genetic_operator <= self.m_crossover_probability + self.m_mutation_probability:
+                    parent_id = self.selectIndividual(True);
+                    self.m_p_population[bad_individual_id] = Individual(bad_individual_id, self.getIndividual(parent_id));
+                    self.m_p_population[bad_individual_id].mutate(self.m_mutation_rate);
+                # New blood
+                else: #if genetic_operator <= self.m_crossover_probability + self.m_mutation_probability + self.m_new_blood_probability:
+                    self.m_p_population[bad_individual_id] = Individual(bad_individual_id);
+        
+                #self.m_p_population[bad_individual_id].print();
+                #print()
+                
+                self.m_fitness_up_to_date = False;
+                self.computeGlobalFitness();
+
     # Accessor on the population
     def getPopulation(self):
         return (self.m_p_population);
@@ -178,6 +248,8 @@ class FlyAlgorithm:
         
     # Get the local fitness (no new computation)
     def getLocalFitness(self, i):
+        if self.m_fitness_up_to_date == False:
+            self.m_p_local_fitness[i] = self.computeLocalFitness(i);
         return self.m_p_local_fitness[i];
     
     def computePopulationFitnesses(self):
@@ -185,7 +257,7 @@ class FlyAlgorithm:
         
             if self.m_global_fitness_function:
                 self.computeGlobalFitness();
-                print ("Global fitness:\t", self.m_global_fitness * 100, "%");
+                #print ("Global fitness:\t", self.m_global_fitness * 100, "%");
         
             for i in range(self.getPopulationSize()):
                 self.computeLocalFitness(i);
@@ -199,12 +271,35 @@ class FlyAlgorithm:
     def getIndividual(self, i):
         return self.m_p_population[i]
     
+    def thresholdSelection(self, aFlag):
+        counter = 0;
+        not_found = True;
+        ind_id = 0;
+
+        while (not_found and counter <= self.getPopulationSize() * 0.5):
+            
+            ind_id = random.randint(0, self.getPopulationSize() - 1);
+            fitness = self.getLocalFitness(ind_id);
+
+            if (aFlag and fitness > 0.0):
+                not_found = False;
+            elif (not aFlag and fitness < 0.0):
+                not_found = False;
+
+            counter += 1
+
+        if not_found:
+            ind_id = self.tournamentSelection(aFlag);
+
+        return ind_id;
+
+
     # Tournament selection.
     # If aFlag is True return the id of the highest fitness amongst 
     # self.m_tournament_size randomly chosen individuals
     # If aFlag is False return the id of the lowest fitness amongst 
     # self.m_tournament_size randomly chosen individuals
-    def tournament(self, aFlag):
+    def tournamentSelection(self, aFlag):
         best_id = random.randint(0, self.getPopulationSize() - 1);
         best_fitness = self.getLocalFitness(best_id);
         
@@ -222,6 +317,12 @@ class FlyAlgorithm:
                     best_fitness = new_fitness;
         
         return best_id;
+
+    def selectIndividual(self, aFlag):
+        if (self.m_use_threshold_selection):
+            return (self.thresholdSelection(aFlag));
+        else:
+            return (self.tournamentSelection(aFlag));
         
     def getBestIndividualId(self):
         self.computePopulationFitnesses();
@@ -238,3 +339,10 @@ class FlyAlgorithm:
     def getWorseIndividual(self):
         self.computePopulationFitnesses();
         return self.getIndividual(self.getWorseIndividualId());
+
+    def setUseMarginalFitness(self, aFlag):
+        self.m_use_marginal_fitness = aFlag;
+
+    def getUseMarginalFitness(self):
+        return (self.m_use_marginal_fitness);
+
