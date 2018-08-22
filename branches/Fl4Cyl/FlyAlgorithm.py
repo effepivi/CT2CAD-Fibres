@@ -65,7 +65,10 @@ class FlyAlgorithm:
         
         # For each individual in the current population, add a new random one
         for i in range(population_size):
+            # Add the new individual to the population
             self.m_p_population.append(Individual(i + population_size));
+            self.m_p_local_fitness.append(0);
+            self.m_sort_index.append(0);
 
         # The local fitnesses are not up-to-date
         self.m_fitness_up_to_date = False;
@@ -84,6 +87,8 @@ class FlyAlgorithm:
 
             # Add the child to the population
             self.m_p_population.append(child)
+            self.m_p_local_fitness.append(0);
+            self.m_sort_index.append(0);
 
         # The local fitnesses are not up-to-date
         self.m_fitness_up_to_date = False;
