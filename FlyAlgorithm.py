@@ -70,6 +70,24 @@ class FlyAlgorithm:
         # The local fitnesses are not up-to-date
         self.m_fitness_up_to_date = False;
 
+    def mitosis(self):
+        # Get the initial population size
+        population_size = self.getPopulationSize();
+        
+        # For each individual in the current population, add a new one by mutation
+        for parent_id in range(population_size):
+            # Copy the parent into the child
+            child = Individual(parent_id + population_size, self.getIndividual(parent_id));
+
+            # Mutate the child (with a high mutation rate
+            child.mutate(self.m_mutation_rate * 2.0);
+
+            # Add the child to the population
+            self.m_p_population.append(child)
+
+        # The local fitnesses are not up-to-date
+        self.m_fitness_up_to_date = False;
+
     def getNumberOfIndividuals(self):
         return (len(self.m_p_population));
      
