@@ -49,7 +49,7 @@ class FlyAlgorithm:
         self.computePopulationFitnesses();
         
         # Get the ID of the best individual
-        best_individual_id = self.getBestIndividualId():
+        best_individual_id = self.getBestIndividualId();
         
         # Replace all the individuals, but the best one, by new random individuals
         for i in range(self.getPopulationSize()):
@@ -217,7 +217,6 @@ class FlyAlgorithm:
                     best_fitness = new_fitness;
         
         return best_id;
-
         
     def getBestIndividualId(self):
         self.computePopulationFitnesses();
