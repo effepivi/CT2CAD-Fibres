@@ -34,9 +34,10 @@ from FlyAlgorithm import *
 ################################################################################
 
 ##### Parameters of the Fly Algorithm #####
-NUMBER_OF_INDIVIDUALS = 5;
-NUMBER_OF_GENES = 2;
-NUMBER_OF_GENERATIONS = 25;
+INITIAL_NUMBER_OF_INDIVIDUALS = 5;
+NUMBER_OF_MITOSIS = 3;
+NUMBER_OF_GENES = 5;
+NUMBER_OF_GENERATIONS = 10;
 
 MAX_VALUE = 1217.0;
 
@@ -93,34 +94,32 @@ g_core_geometry_set  = [];
 
 g_best_population = [];
 
-g_fly_algorithm1 = 0;
-number_of_evaluations1 = 0;
-best_ncc1 = 0;
+g_fly_algorithm = 0;
+g_number_of_evaluations = 0;
+g_number_of_generations = 0;
+g_number_of_mitosis = 0;
+g_best_ncc = 0;
 
 g_best_ncc_sinogram = [];
 g_best_ncc_CT_slice = [];
 
 
-def cropCenter(img,cropx,cropy):
-    y,x = img.shape
-    startx = x//2-(cropx//2)
-    starty = y//2-(cropy//2)    
-    return img[starty:starty+cropy,startx:startx+cropx]
+########
+def cropCenter(anImage, aNewSizeInX, aNewSizeInY):
+    y, x = anImage.shape
+    start_x = x // 2 - (aNewSizeInX // 2);
+    start_y = y // 2 - (aNewSizeInY // 2);   
+    return anImage[start_y : start_y + aNewSizeInY,
+            start_x : start_x + aNewSizeInX]
+
+
+######################################################
+def localFitnessFunction(ind_id, genes, aFlyAlgorithm):
+#######################################################
+    global g_best_ncc;
+    global g_number_of_evaluations;
     
-
-
-################################################################################
-# Fitness functions
-################################################################################
-
-
-#########################################################
-def local_fitness_function1(ind_id, genes, aFlyAlgorithm):
-#########################################################
-    global best_ncc1;
-    global number_of_evaluations1;
-    
-    setGeometry1(genes);
+    setGeometry(genes);
     sinogram = computeSinogram();
     
     theta = np.linspace(0., angular_span_in_degrees, number_of_projections, endpoint=False);
@@ -133,28 +132,28 @@ def local_fitness_function1(ind_id, genes, aFlyAlgorithm):
     normalised_CT       = (test_image       - test_image.mean())       / test_image.std();
 
 
-    number_of_evaluations1 += 1;
+    g_number_of_evaluations += 1;
     
        
     # Fitness based on NCC
     ncc =  np.multiply(g_reference_sinogram, normalised_sinogram).mean();
 
-    if best_ncc1 < ncc:
+    if g_best_ncc < ncc:
         np.savetxt("sinogram_gvxr.txt", normalised_sinogram);
         np.savetxt("CT_gvxr.txt",       normalised_CT);
-        best_ncc1 = ncc;
+        g_best_ncc = ncc;
         #print(number_of_evaluations, ncc*100, genes)
 
     return (ncc);
 
 
 #######################
-def initFlyAlgorithm1():
+def initFlyAlgorithm():
 #######################
     
     fly_algorithm = FlyAlgorithm();
-    fly_algorithm.setNumberOfIndividuals(NUMBER_OF_INDIVIDUALS, 5);
-    Individual.setFitnessFunction(  local_fitness_function1);
+    fly_algorithm.setNumberOfIndividuals(INITIAL_NUMBER_OF_INDIVIDUALS, NUMBER_OF_GENES);
+    Individual.setFitnessFunction(localFitnessFunction);
     return (fly_algorithm);
 
 
@@ -186,7 +185,7 @@ def initXRaySimulator():
     print("angular_step: ", str(angular_step))
     
 
-def setGeometry1(apGeneSet):
+def setGeometry(apGeneSet):
 
     global g_matrix_geometry;
    
@@ -286,7 +285,7 @@ def computeSinogram():
 class SubplotAnimation(animation.TimedAnimation):
     def __init__(self):
     
-        global g_fly_algorithm1
+        global g_fly_algorithm
         global g_reference_sinogram
         global g_reference_CT
     
@@ -308,7 +307,7 @@ class SubplotAnimation(animation.TimedAnimation):
         gvxr.setWindowSize(512, 512);
 
         # Create a Fly Algorithm instance
-        g_fly_algorithm1 = initFlyAlgorithm1();
+        g_fly_algorithm = initFlyAlgorithm();
 
         # Create the X-ray simulator
         initXRaySimulator();
@@ -339,26 +338,25 @@ class SubplotAnimation(animation.TimedAnimation):
         
         animation.TimedAnimation.__init__(self, self.fig, interval=1, blit=True)
         
-        self.run_id = 0;
 
     def _draw_frame(self, framedata):
         global g_best_ncc_sinogram;
         global g_best_ncc_CT_slice;
-        global number_of_evaluations1;
+        global g_number_of_generations;
+        global g_number_of_mitosis;
         
- 
         # Create a new population
-        g_fly_algorithm1.evolve()
-        self.run_id += 1;
+        g_fly_algorithm.evolve()
+        g_number_of_generations += 1;
         
         # Print the best individual
-        g_fly_algorithm1.getBestIndividual().print()
+        g_fly_algorithm.getBestIndividual().print()
 
         # Get its genes
-        best_individual_s_genes = g_fly_algorithm1.getBestIndividual().m_p_gene_set;
+        best_individual_s_genes = g_fly_algorithm.getBestIndividual().m_p_gene_set;
 
         # Reset the geometry using them
-        setGeometry1(best_individual_s_genes);
+        setGeometry(best_individual_s_genes);
         
         # Create the corresponding sinogram
         sinogram = computeSinogram();
@@ -377,10 +375,10 @@ class SubplotAnimation(animation.TimedAnimation):
         
         red = (1,0,1,0.5)
 
-        self.ncc_sinogram = self.axarr[0,3].scatter(self.run_id, g_best_ncc_sinogram[-1], color=red, s=2, alpha=1.0)
-        self.ncc_CT_slice = self.axarr[1,3].scatter(self.run_id, g_best_ncc_CT_slice[-1], color=red, s=2, alpha=1.0)
+        self.ncc_sinogram = self.axarr[0,3].scatter(g_number_of_generations, g_best_ncc_sinogram[-1], color=red, s=2, alpha=1.0)
+        self.ncc_CT_slice = self.axarr[1,3].scatter(g_number_of_generations, g_best_ncc_CT_slice[-1], color=red, s=2, alpha=1.0)
         
-        if self.run_id == 1:
+        if g_number_of_generations == 1:
             self.img = [];
             self.img.append(self.axarr[0,0].imshow(g_reference_sinogram, cmap=self.colour_map))
             self.img.append(self.axarr[0,1].imshow(normalised_sinogram, cmap=self.colour_map))
@@ -389,7 +387,6 @@ class SubplotAnimation(animation.TimedAnimation):
             self.img.append(self.axarr[1,0].imshow(g_reference_CT, cmap=plt.cm.gray))
             self.img.append(self.axarr[1,1].imshow(normalised_CT, cmap=plt.cm.gray))
             self.img.append(self.axarr[1,2].imshow(np.abs(g_reference_CT - normalised_CT), cmap=self.colour_map))
-
 
             self.axarr[0,0].set_axis_off();
             self.axarr[0,1].set_axis_off();
@@ -440,15 +437,22 @@ class SubplotAnimation(animation.TimedAnimation):
             self.img[5].set_data(np.abs(g_reference_CT - normalised_CT))
             
             self.fig.canvas.draw()
-           
-
-        self.axarr[0,3].get_yaxis().set_ticks(np.linspace(0, 100, 11, endpoint=True));
-        self.axarr[1,3].get_yaxis().set_ticks(np.linspace(0, 100, 11, endpoint=True));
-        self.axarr[0,3].get_xaxis().set_ticks(np.linspace(0, NUMBER_OF_GENERATIONS + 1, NUMBER_OF_GENERATIONS + 2, endpoint=True));
-
-        self.axarr[1,3].get_xaxis().set_ticks(np.linspace(0, NUMBER_OF_GENERATIONS + 1, NUMBER_OF_GENERATIONS + 2, endpoint=True));
         
-        
+        x_tics = np.linspace(0, NUMBER_OF_GENERATIONS * (NUMBER_OF_MITOSIS + 1), NUMBER_OF_GENERATIONS - 1, endpoint=True);
+        y_tics = np.linspace(0, 100, 11, endpoint=True);
+
+        self.axarr[0,3].get_xaxis().set_ticks(x_tics);
+        self.axarr[1,3].get_xaxis().set_ticks(x_tics);
+
+        self.axarr[0,3].get_yaxis().set_ticks(y_tics);
+        self.axarr[1,3].get_yaxis().set_ticks(y_tics);
+
+        # Time for a mitosis
+        if not (g_number_of_generations % NUMBER_OF_GENERATIONS):
+            print ("Mitosis at Generation #", g_number_of_generations)
+            g_fly_algorithm.mitosis();
+            g_number_of_mitosis += 1;
+            
         #line1.set_ydata(y1)
         #draw()
         #for ax in self.axarr:
@@ -459,7 +463,7 @@ class SubplotAnimation(animation.TimedAnimation):
         #self.fig.tight_layout()
 
     def new_frame_seq(self):
-        return iter(range(NUMBER_OF_GENERATIONS))
+        return iter(range(NUMBER_OF_GENERATIONS * (NUMBER_OF_MITOSIS + 1)))
 
 
    
@@ -494,13 +498,13 @@ if True:
     exit()
     
     # Print the best individual
-    g_fly_algorithm1.getBestIndividual().print()
+    g_fly_algorithm.getBestIndividual().print()
 
     # Get its genes
-    best_individual_s_genes = g_fly_algorithm1.getBestIndividual().m_p_gene_set;
+    best_individual_s_genes = g_fly_algorithm.getBestIndividual().m_p_gene_set;
 
     # Reset the geometry using them
-    setGeometry1(best_individual_s_genes);
+    setGeometry(best_individual_s_genes);
     
     # Create the corresponding sinogram
     sinogram = computeSinogram();
