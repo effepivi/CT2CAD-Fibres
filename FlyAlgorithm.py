@@ -59,6 +59,17 @@ class FlyAlgorithm:
         # The local fitnesses are not up-to-date
         self.m_fitness_up_to_date = False;
 
+    def doublePopulationSize(self):
+        # Get the initial population size
+        population_size = self.getPopulationSize();
+        
+        # For each individual in the current population, add a new random one
+        for i in range(population_size):
+            self.m_p_population.append(Individual(i + population_size));
+
+        # The local fitnesses are not up-to-date
+        self.m_fitness_up_to_date = False;
+
     def getNumberOfIndividuals(self):
         return (len(self.m_p_population));
      
