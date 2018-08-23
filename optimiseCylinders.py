@@ -29,15 +29,19 @@ from lsf import *
 from FlyAlgorithm import *
 
 
+from multiprocessing import Pool
+
+
+
 ################################################################################
 # Global variables
 ################################################################################
 
 ##### Parameters of the Fly Algorithm #####
-INITIAL_NUMBER_OF_INDIVIDUALS = 15;
+INITIAL_NUMBER_OF_INDIVIDUALS = 5;
 NUMBER_OF_MITOSIS = 3;
 NUMBER_OF_GENES = 2;
-NUMBER_OF_GENERATIONS = 5;
+NUMBER_OF_GENERATIONS = 10;
 
 MAX_VALUE = 1217.0;
 
@@ -55,7 +59,7 @@ distance_source_detector_in_m  = 145.0;
 distance_object_detector_in_m =    0.08; # = 80 mm
 
 #number_of_projections = 900;
-number_of_projections = 90;
+number_of_projections = 45;
 angular_span_in_degrees = 180.0;
 
 #energy_spectrum_in_keV = [(33, 0.97), (66, 0.02), (99, 0.01)];
@@ -113,6 +117,37 @@ def cropCenter(anImage, aNewSizeInX, aNewSizeInY):
             start_x : start_x + aNewSizeInX]
 
 
+temp_mean = 0.0;
+temp_std = 0.0;
+
+def f1(x):
+    global temp_mean;
+    global temp_std;
+    return (x-temp_mean)/temp_std;
+
+def f2(x, y):
+    return (x*y);
+
+
+def productImage(anImage1, anImage2):
+
+    return (np.multiply(anImage1, anImage2));
+    p = Pool(12)
+    return (p.map(f2, (anImage1, anImage2)))
+
+def normaliseImage(anImage):
+    global temp_mean;
+    global temp_std;
+
+    temp_mean = anImage.mean();
+    temp_std = anImage.std();
+
+    return (anImage-temp_mean)/temp_std
+
+    p = Pool(12)
+    return (p.map(f1, anImage))
+    
+
 ################################################################################
 # Fitness functions
 ################################################################################
@@ -132,20 +167,22 @@ def globalFitnessFunction(aPopulation, resetAll = True):
     test_image = iradon(sinogram.T, theta=theta, circle=True);
     
 
-    normalised_sinogram = (sinogram - sinogram.mean()) / sinogram.std();
-    normalised_CT       = (test_image       - test_image.mean())       / test_image.std();
+    normalised_sinogram = normaliseImage(sinogram);
+    normalised_CT = normaliseImage(test_image);
+    #normalised_sinogram = (sinogram - sinogram.mean()) / sinogram.std();
+    #normalised_CT       = (test_image       - test_image.mean())       / test_image.std();
 
     g_number_of_evaluations += 1;
     
     # Fitness based on NCC
-    ncc_sinogram =  np.multiply(g_reference_sinogram, normalised_sinogram).mean();
-    ncc_CT       =  np.multiply(g_reference_CT, normalised_CT).mean();
+    ncc_sinogram =  productImage(g_reference_sinogram, normalised_sinogram).mean();
+    ncc_CT       =  productImage(g_reference_CT, normalised_CT).mean();
 
     ncc = (ncc_sinogram + ncc_CT) / 2.0;
     ncc = ncc_CT * ncc_sinogram;
     
     # Display the 3D scene (no event loop)
-    gvxr.displayScene();
+    #gvxr.displayScene();
 
     if g_best_ncc < ncc:
         
@@ -167,12 +204,12 @@ def localFitnessFunction(ind_id, genes, aFlyAlgorithm):
     global_fitness = aFlyAlgorithm.getGlobalFitness();
     #print("global fitness:\t", global_fitness)
 
-    state = aFlyAlgorithm.m_p_population[ind_id].m_is_active;
+    state = aFlyAlgorithm.isIndividualActive(ind_id);
     
     if state:
-        aFlyAlgorithm.m_p_population[ind_id].m_is_active = False;
-        local_fitness = global_fitness - globalFitnessFunction(aFlyAlgorithm.m_p_population, False);
-        aFlyAlgorithm.m_p_population[ind_id].m_is_active = True;
+        aFlyAlgorithm.tempDeactivateIndividual(ind_id);
+        local_fitness = global_fitness - globalFitnessFunction(aFlyAlgorithm.getPopulation(), False);
+        aFlyAlgorithm.tempActivateIndividual(ind_id);
     
     #print("local fitness(", ind_id, "):\t", local_fitness)
     return local_fitness;
@@ -193,8 +230,14 @@ def initFlyAlgorithm():
     fly_algorithm.setNewBloodProbability( 0.0);
     fly_algorithm.setElitismProbability(  0.0);
 
-    fly_algorithm.setUseTournamentSelection(True);
+    fly_algorithm.setUseThresholdSelection(True);
+    #fly_algorithm.setUseTournamentSelection(True);
+    #fly_algorithm.setUseSharing(True);
 
+    print ("Use marginal fitness:\t", fly_algorithm.getUseMarginalFitness());
+    print ("Use threshold selection:\t", fly_algorithm.getUseThresholdSelection());
+    print ("Use tournament selection:\t", fly_algorithm.getUseTournamentSelection());
+    print ("Use sharing:\t", fly_algorithm.getUseSharing());
     return (fly_algorithm);
 
 
@@ -224,7 +267,86 @@ def initXRaySimulator():
     print("Number of projections: ", str(number_of_projections))
     print("angular_span_in_degrees: ", str(angular_span_in_degrees))
     print("angular_step: ", str(angular_step))
-    
+   
+def getDistance(i, j):
+    global g_fly_algorithm;
+
+    x_i = g_fly_algorithm.getIndividual(i).getGene(0);
+    y_i = g_fly_algorithm.getIndividual(i).getGene(1);
+
+    x_j = g_fly_algorithm.getIndividual(j).getGene(0);
+    y_j = g_fly_algorithm.getIndividual(j).getGene(1);
+
+    x_i = g_matrix_x + (x_i - 0.5) * max(g_matrix_width, g_matrix_height) * 2.0;
+    y_i = g_matrix_y + (y_i - 0.5) * max(g_matrix_width, g_matrix_height) * 2.0;
+
+    x_j = g_matrix_x + (x_j - 0.5) * max(g_matrix_width, g_matrix_height) * 2.0;
+    y_j = g_matrix_y + (y_j - 0.5) * max(g_matrix_width, g_matrix_height) * 2.0;
+
+    return (math.sqrt((x_i - x_j) * (x_i - x_j) + (y_i - y_j) * (y_i - y_j)));
+
+def killBadFlies():
+    g_fly_algorithm.computeGlobalFitness();
+
+    for i in range(g_fly_algorithm.getPopulationSize()):
+        
+        if (g_fly_algorithm.getLocalFitness(i)):
+            g_fly_algorithm.deactivateIndividual(i);
+            g_fly_algorithm.computeGlobalFitness();
+
+
+def clean(aFlag):
+    global g_fly_algorithm;
+    print ("Cleaning");
+    has_killed = True;
+
+    while has_killed == True:
+        has_killed = False;
+        #print ("Reset cleaning");
+        g_fly_algorithm.computePopulationFitnesses();
+        local_fitness_set = g_fly_algorithm.getLocalFitnessSet();
+        
+        for i in range(g_fly_algorithm.getPopulationSize()):
+            if g_fly_algorithm.isIndividualActive(i):
+                for j in range(g_fly_algorithm.getPopulationSize()):
+                    if i != j:
+                        if g_fly_algorithm.isIndividualActive(j):
+
+                            distance = getDistance(i, j);
+                            #print ("\t\t\t", i, "/", j, "\t", distance, "\t", 2.0 * fiber_radius);
+
+                            if distance <= 2.0 * fiber_radius:
+                                fitness_i = local_fitness_set[i];
+                                fitness_j = local_fitness_set[j];
+
+                                #print ("\t\t\t\t", fitness_i, "\t", fitness_j)
+                                if aFlag:
+                                    # Kill i
+                                    if fitness_i < fitness_j:
+                                        g_fly_algorithm.kill(i);
+                                        #has_killed = True;
+                                        #print ("Killing");
+
+                                    # Kill j
+                                    elif fitness_j < fitness_i:
+                                        g_fly_algorithm.kill(j);
+                                        #has_killed = True;
+                                        #print ("Killing");
+                                else:
+                                    if fitness_i < fitness_j:
+                                        g_fly_algorithm.deactivateIndividual(i);
+                                        #has_killed = True;
+                                        #print ("Killing");
+
+                                    elif fitness_j < fitness_i:
+                                        g_fly_algorithm.deactivateIndividual(j);
+                                        #has_killed = True;
+                                        #print ("Killing");
+
+                                #setGeometry(g_fly_algorithm.getPopulation(), True);    
+                                #gvxr.displayScene();
+
+    print ("Cleaning: done");
 
 def setGeometry(aPopuation, resetAll = True):
 
@@ -254,6 +376,7 @@ def setGeometry(aPopuation, resetAll = True):
             x = g_matrix_x + (individual.getGene(0) - 0.5) * max(g_matrix_width, g_matrix_height) * 2.0;
             y = g_matrix_y + (individual.getGene(1) - 0.5) * max(g_matrix_width, g_matrix_height) * 2.0;
 
+            #print (x, " ", y);
             g_fiber_geometry_set[-1].translate(y, 0, x, "micrometer");
             g_core_geometry_set[ -1].translate(y, 0, x, "micrometer");    
     
@@ -262,7 +385,7 @@ def setGeometry(aPopuation, resetAll = True):
     
     for i in range(len(aPopuation)):
     
-        if aPopuation[i].m_is_active:
+        if aPopuation[i].isActive():
             fiber_geometry_set.append(g_fiber_geometry_set[i])
             core_geometry_set.append(g_core_geometry_set[i])
 
@@ -382,14 +505,15 @@ class SubplotAnimation(animation.TimedAnimation):
         reference_CT       = cropCenter(np.loadtxt("W_ML_20keV.tomo-original.txt"),detector_width_in_pixels,detector_width_in_pixels);
         reference_sinogram = radon(reference_CT, theta=theta, circle=True).T
 
-
-        g_reference_sinogram = (reference_sinogram - reference_sinogram.mean()) / reference_sinogram.std();
-        g_reference_CT       = (reference_CT       - reference_CT.mean())       / reference_CT.std();
+        g_reference_sinogram = normaliseImage(reference_sinogram);
+        g_reference_CT       = normaliseImage(reference_CT);
+        #g_reference_sinogram = (reference_sinogram - reference_sinogram.mean()) / reference_sinogram.std();
+        #g_reference_CT       = (reference_CT       - reference_CT.mean())       / reference_CT.std();
 
 
         np.savetxt("sinogram_ref.txt", g_reference_sinogram);
         np.savetxt("CT_ref.txt",       g_reference_CT);
-
+        
         # Create an OpenGL context
         print("Create an OpenGL context")
         gvxr.createWindow();
@@ -435,7 +559,10 @@ class SubplotAnimation(animation.TimedAnimation):
         global g_number_of_mitosis;
         
         # Create a new population
-        g_fly_algorithm.evolveGeneration()
+        g_fly_algorithm.evolveGeneration();
+        gvxr.displayScene();
+        
+        clean(True);
         g_number_of_generations += 1;
         
         # Print the best individual
@@ -446,7 +573,8 @@ class SubplotAnimation(animation.TimedAnimation):
 
         # Reset the geometry using them
         #setGeometry(g_best_population, True);
-        setGeometry(g_fly_algorithm.m_p_population, True);
+        setGeometry(g_fly_algorithm.getPopulation(), True);
+        gvxr.displayScene();
         
         # Create the corresponding sinogram
         sinogram = computeSinogram();
@@ -456,12 +584,14 @@ class SubplotAnimation(animation.TimedAnimation):
         reconstruction_fbp = iradon(sinogram.T, theta=theta, circle=True);
         
         # Normalise the sinogram and the reconstruction
-        normalised_sinogram = (sinogram - sinogram.mean()) / sinogram.std();
-        normalised_CT       = (reconstruction_fbp - reconstruction_fbp.mean()) / reconstruction_fbp.std()    
+        normalised_sinogram = normaliseImage(sinogram);
+        normalised_CT = normaliseImage(reconstruction_fbp);
+        #normalised_sinogram = (sinogram - sinogram.mean()) / sinogram.std();
+        #normalised_CT       = (reconstruction_fbp - reconstruction_fbp.mean()) / reconstruction_fbp.std()    
 
         # Compute the ZNCCs    
-        g_best_ncc_sinogram.append(int(100*np.multiply(normalised_sinogram, g_reference_sinogram).mean()));
-        g_best_ncc_CT_slice.append(int(100*np.multiply(g_reference_CT, normalised_CT).mean()));
+        g_best_ncc_sinogram.append(int(100*productImage(normalised_sinogram, g_reference_sinogram).mean()));
+        g_best_ncc_CT_slice.append(int(100*productImage(g_reference_CT, normalised_CT).mean()));
         
         print(g_number_of_generations, "\tNCC sinogram: ", g_best_ncc_sinogram[-1], "\tNCC CT slice: ", g_best_ncc_CT_slice[-1]);
         red = (1,0,1,0.5)
@@ -508,7 +638,7 @@ class SubplotAnimation(animation.TimedAnimation):
             
             self.fig.set_tight_layout(True)
 
-            print('fig size: {0} DPI, size in inches {1}'.format(self.fig.get_dpi(), self.fig.get_size_inches()))
+            #print('fig size: {0} DPI, size in inches {1}'.format(self.fig.get_dpi(), self.fig.get_size_inches()))
             #self.axarr[0,3].get_xaxis().set_visible(False)
             #self.axarr[1,3].get_xaxis().set_visible(False)
 
@@ -546,12 +676,12 @@ class SubplotAnimation(animation.TimedAnimation):
 
         g_fly_algorithm.computePopulationFitnesses();
 
-        good_individuals = sum(1 for item in g_fly_algorithm.m_p_local_fitness if item>(0.0))
-        print("Good individuals: ", good_individuals, "/", len(g_fly_algorithm.m_p_local_fitness))
+        good_individuals = sum(1 for item in g_fly_algorithm.getLocalFitnessSet() if item>(0.0))
+        print("Good individuals: ", good_individuals, "/", g_fly_algorithm.getPopulationSize())
 
         # Time for a mitosis
-        if not (g_number_of_generations % NUMBER_OF_GENERATIONS) or good_individuals >= len(g_fly_algorithm.m_p_local_fitness) / 2:
-            print ("Mitosis at Generation #", g_number_of_generations)
+        if not (g_number_of_generations % NUMBER_OF_GENERATIONS):# or good_individuals >= len(g_fly_algorithm.m_p_local_fitness) / 2:
+            print ("Mitosis at Generation #", g_number_of_generations, " from ", g_fly_algorithm.getPopulationSize(), " to ", g_fly_algorithm.getPopulationSize() * 2, " individuals")
 
             g_fly_algorithm.mitosis();
             g_number_of_mitosis += 1;
@@ -619,8 +749,12 @@ if True:
     g_matrix_x = best_individual_s_genes[0] * detector_width_in_pixels * pixel_size_in_micrometer - detector_width_in_pixels * pixel_size_in_micrometer / 2.0;
     g_matrix_y = best_individual_s_genes[1] * detector_width_in_pixels * pixel_size_in_micrometer - detector_width_in_pixels * pixel_size_in_micrometer / 2.0;
 
-    setGeometry(g_fly_algorithm.m_p_population, True);
+    #setGeometry(g_fly_algorithm.getPopulation(), True);
+    #gvxr.renderLoop();
 
+    #clean(True);
+    setGeometry(g_fly_algorithm.getPopulation(), True);
+    
     #plt.rcParams['animation.ffmpeg_path'] = '/usr/bin/ffmpeg'
     #plt.rcParams['animation.ffmpeg_args'] = '-report'
     
@@ -646,7 +780,7 @@ if True:
     # N: display the X-ray image in negative or positive
     # H: display/hide the X-ray detector
     # V: display/hide the normal vectors
-    #gvxr.renderLoop();
+    gvxr.renderLoop();
 
     
     
@@ -655,84 +789,76 @@ if True:
 
 
     # Run the animation and save in a file
-    #ani.save('cylinders_sinogram.gif', fps=1, writer='imagemagick', metadata=metadata);
+    ani.save('cylinders_sinogram.gif', fps=1, writer='imagemagick', metadata=metadata);
     
     # Run the animation
-    plt.show()
-    
-    exit()
-    
-    # Print the best individual
-    g_fly_algorithm.getBestIndividual().print()
+    #plt.show()
 
-    # Get its genes
-    best_individual_s_genes = g_fly_algorithm.getBestIndividual().m_p_gene_set;
+    g_fly_algorithm.setPopulation(copy.deepcopy(g_best_population));
+    clean(False);
 
-    # Reset the geometry using them
-    setGeometry(best_individual_s_genes);
-    
-    # Create the corresponding sinogram
+    setGeometry(g_fly_algorithm.getPopulation(), True);    
     sinogram = computeSinogram();
-    np.savetxt("sinogram_gvxr.txt", sinogram);
-        
+    gvxr.displayScene();
+    
+    theta = np.linspace(0., angular_span_in_degrees, number_of_projections, endpoint=False);
+    test_image = iradon(sinogram.T, theta=theta, circle=True);
+    
+    normalised_sinogram = normaliseImage(sinogram);
+    normalised_CT = normaliseImage(test_image);
+    #normalised_sinogram = (sinogram - sinogram.mean()) / sinogram.std();
+    #normalised_CT       = (test_image       - test_image.mean())       / test_image.std();
+
+    normalised_sinogram = normaliseImage(sinogram);
+    normalised_CT = normaliseImage(test_image);
+
+    # Fitness based on NCC
+    ncc_sinogram =  productImage(g_reference_sinogram, normalised_sinogram).mean();
+    ncc_CT       =  productImage(g_reference_CT, normalised_CT).mean();
+
+    print("Final\tNCC sinogram: ", 100*ncc_sinogram, "\tNCC CT slice: ", 100*ncc_CT);
+    
     # Display the 3D scene (no event loop)
     gvxr.displayScene();
-
-    # Reconstruct it using the FBP algorithm
-    theta = np.linspace(0., angular_span_in_degrees, number_of_projections, endpoint=False);
-    reconstruction_fbp = iradon(sinogram.T, theta=theta, circle=True);
-    np.savetxt("reconstruction_gvxr_fbp.txt", reconstruction_fbp);
         
-    # Normalise the sinogram and the reconstruction
-    normalised_sinogram = (sinogram - sinogram.mean()) / sinogram.std();
-    normalised_CT       = (reconstruction_fbp - reconstruction_fbp.mean()) / reconstruction_fbp.std()    ;
+    np.savetxt("final_sinogram_gvxr.txt", normalised_sinogram);
+    np.savetxt("final_CT_gvxr.txt",       normalised_CT);
+
+    gvxr.renderLoop();
     
     # Display the 3D scene (no event loop)
-    # Run an interactive loop 
-    # (can rotate the 3D scene and zoom-in)
-    # Keys are:
-    # Q/Escape: to quit the event loop (does not close the window)
-    # B: display/hide the X-ray beam
-    # W: display the polygon meshes in solid or wireframe
-    # N: display the X-ray image in negative or positive
-    # H: display/hide the X-ray detector
-    # V: display/hide the normal vectors
+    killBadFlies();
+    gvxr.displayScene();
+        
+    setGeometry(g_fly_algorithm.getPopulation(), False);    
+    sinogram = computeSinogram();
+    
+    theta = np.linspace(0., angular_span_in_degrees, number_of_projections, endpoint=False);
+    test_image = iradon(sinogram.T, theta=theta, circle=True);
+    
+    normalised_sinogram = normaliseImage(sinogram);
+    normalised_CT = normaliseImage(test_image);
+    #normalised_sinogram = (sinogram - sinogram.mean()) / sinogram.std();
+    #normalised_CT       = (test_image       - test_image.mean())       / test_image.std();
+
+    normalised_sinogram = normaliseImage(sinogram);
+    normalised_CT = normaliseImage(test_image);
+
+    # Fitness based on NCC
+    ncc_sinogram =  productImage(g_reference_sinogram, normalised_sinogram).mean();
+    ncc_CT       =  productImage(g_reference_CT, normalised_CT).mean();
+
+    print("Final\tNCC sinogram: ", 100*ncc_sinogram, "\tNCC CT slice: ", 100*ncc_CT);
+
+    np.savetxt("final_final_sinogram_gvxr.txt", normalised_sinogram);
+    np.savetxt("final_final_CT_gvxr.txt",       normalised_CT);
+
     gvxr.renderLoop();
 
-    
-    
-    
-    
-    
-    
-    
-    exit();
-    
-    
-        
 
+    for ind in g_fly_algorithm.getPopulation():
+        if ind.isActive():
+            ind.print();
 
-
-    anim = animation.FuncAnimation(g_fig, animate, frames=NUMBER_OF_GENERATIONS, blit=True);
-    anim.save('basic_animation.avi', fps=30, extra_args=['-vcodec', 'libx264'], writer='ffmpeg');
-    plt.show();
-    exit();
+    exit()
     
-    
-
-
-
-
-#except Exception as error:
-#    print ("Exception caught:");
-#    exc_type, exc_obj, exc_tb = sys.exc_info()
-#    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-#    print("\t", exc_type, fname, exc_tb.tb_lineno)
-
-    
-exit()
-
-
-# Scene geometrical properties
-# See Figure 2.1 on Page 15 of Modelling the response of X-ray detectors and removing artefacts in 3D tomography
-
