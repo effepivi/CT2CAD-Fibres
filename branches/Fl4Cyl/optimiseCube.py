@@ -21,8 +21,11 @@ import logging
 logger = logging.getLogger('matplotlib.animation')
 logger.setLevel(logging.INFO)
 
+import skimage.measure as measure;
 
 from skimage.transform import radon, iradon, iradon_sart
+
+from copy import deepcopy
 
 from lsf import *
 
@@ -86,8 +89,10 @@ g_fiber_geometry  = gvxr.emptyMesh();
 g_core_geometry   = gvxr.emptyMesh();
 g_matrix_geometry = gvxr.emptyMesh();
 
-g_reference_CT       = np.zeros(1);
-g_reference_sinogram = np.zeros(1);
+g_reference_CT        = np.zeros(1);
+g_reference_sinogram  = np.zeros(1);
+g_normalised_CT       = np.zeros(1);
+g_normalised_sinogram = np.zeros(1);
 
 g_fiber_geometry_set = [];
 g_core_geometry_set  = [];
@@ -103,6 +108,9 @@ g_best_ncc = 0;
 g_best_ncc_sinogram = [];
 g_best_ncc_CT_slice = [];
 
+g_output_metrics_file = open("cube_output_metrics_file_ssim.csv", "w");
+
+g_first_run = True;
 
 ########
 def cropCenter(anImage, aNewSizeInX, aNewSizeInY):
@@ -113,11 +121,59 @@ def cropCenter(anImage, aNewSizeInX, aNewSizeInY):
             start_x : start_x + aNewSizeInX]
 
 
+def sinogramSSIM():
+    return measure.compare_ssim( g_reference_sinogram, g_normalised_sinogram);
+
+def sinogramMSE():
+    return measure.compare_mse( g_reference_sinogram, g_normalised_sinogram);
+
+def sinogramNRMSE_euclidean():
+    return measure.compare_nrmse(g_reference_sinogram, g_normalised_sinogram, 'Euclidean');
+
+def sinogramNRMSE_mean():
+    return measure.compare_nrmse(g_reference_sinogram, g_normalised_sinogram, 'mean');
+
+def sinogramNRMSE_minMax():
+    return measure.compare_nrmse(g_reference_sinogram, g_normalised_sinogram, 'min-max');
+
+def sinogramPSNR():
+    return measure.compare_psnr(g_reference_sinogram, g_normalised_sinogram);
+
+def sinogramNCC():
+    return np.multiply(g_reference_sinogram, g_normalised_sinogram).mean();
+
+
+def reconstructionSSIM():
+    return measure.compare_ssim( g_reference_CT, g_normalised_CT);
+
+def reconstructionMSE():
+    return measure.compare_mse( g_reference_CT, g_normalised_CT);
+
+def reconstructionNRMSE_euclidean():
+    return measure.compare_nrmse(g_reference_CT, g_normalised_CT, 'Euclidean');
+
+def reconstructionNRMSE_mean():
+    return measure.compare_nrmse(g_reference_CT, g_normalised_CT, 'mean');
+
+def reconstructionNRMSE_minMax():
+    return measure.compare_nrmse(g_reference_CT, g_normalised_CT, 'min-max');
+
+def reconstructionPSNR():
+    return measure.compare_psnr(g_reference_CT, g_normalised_CT);
+
+def reconstructionNCC():
+    return np.multiply(g_reference_CT, g_normalised_CT).mean();
+
+
 ######################################################
 def localFitnessFunction(ind_id, genes, aFlyAlgorithm):
 #######################################################
     global g_best_ncc;
     global g_number_of_evaluations;
+    global g_normalised_CT;
+    global g_normalised_sinogram;
+    global g_first_run;
+
     
     setGeometry(genes);
     sinogram = computeSinogram();
@@ -128,22 +184,30 @@ def localFitnessFunction(ind_id, genes, aFlyAlgorithm):
     # Display the 3D scene (no event loop)
     gvxr.displayScene();
 
-    normalised_sinogram = (sinogram - sinogram.mean()) / sinogram.std();
-    normalised_CT       = (test_image       - test_image.mean())       / test_image.std();
+    g_normalised_sinogram = (sinogram - sinogram.mean()) / sinogram.std();
+    g_normalised_CT       = (test_image       - test_image.mean())       / test_image.std();
 
 
     g_number_of_evaluations += 1;
     
+    aFlyAlgorithm.getIndividual().computeMetrics();
+
        
     # Fitness based on NCC
-    #ncc =  np.multiply(g_reference_sinogram, normalised_sinogram).mean();
-    ncc =  np.multiply(g_reference_CT, normalised_CT).mean();
+    #ncc =  np.multiply(g_reference_sinogram, g_normalised_sinogram).mean();
+    #ncc =  np.multiply(g_reference_CT, g_normalised_CT).mean();
+    ncc = -aFlyAlgorithm.getIndividual().getMetrics(1);
 
-    if g_best_ncc < ncc:
-        np.savetxt("sinogram_gvxr.txt", normalised_sinogram);
-        np.savetxt("CT_gvxr.txt",       normalised_CT);
+    if g_first_run:
+        np.savetxt("sinogram_gvxr.txt", g_normalised_sinogram);
+        np.savetxt("CT_gvxr.txt",       g_normalised_CT);
         g_best_ncc = ncc;
-        #print(number_of_evaluations, ncc*100, genes)
+        g_first_run = False;
+    elif g_best_ncc < ncc:
+        np.savetxt("sinogram_gvxr.txt", g_normalised_sinogram);
+        np.savetxt("CT_gvxr.txt",       g_normalised_CT);
+        g_best_ncc = ncc;
+        #print("Best ncc so far", g_number_of_evaluations, ncc*100, genes)
 
     return (ncc);
 
@@ -155,6 +219,29 @@ def initFlyAlgorithm():
     fly_algorithm = FlyAlgorithm();
     fly_algorithm.setNumberOfIndividuals(INITIAL_NUMBER_OF_INDIVIDUALS, NUMBER_OF_GENES);
     Individual.setFitnessFunction(localFitnessFunction);
+    
+    Individual.setGeneLabel(0, 'x');
+    Individual.setGeneLabel(1, 'y');
+    Individual.setGeneLabel(2, 'width');
+    Individual.setGeneLabel(3, 'height');
+    Individual.setGeneLabel(4, 'rotation angle');
+    
+    Individual.addMetrics('sinogram_ssim',            True,  sinogramSSIM);
+    Individual.addMetrics('sinogram_mse',             False, sinogramMSE);
+    Individual.addMetrics('sinogram_nrmse_euclidean', False, sinogramNRMSE_euclidean);
+    Individual.addMetrics('sinogram_nrmse_mean',      False, sinogramNRMSE_mean);
+    Individual.addMetrics('sinogram_nrmse_min_max',   False, sinogramNRMSE_minMax);
+    Individual.addMetrics('sinogram_psnr',            True,  sinogramPSNR);
+    Individual.addMetrics('sinogram_ncc',             True,  sinogramNCC);
+
+    Individual.addMetrics('fbp_ssim',            True,  reconstructionSSIM);
+    Individual.addMetrics('fbp_mse',             False, reconstructionMSE);
+    Individual.addMetrics('fbp_nrmse_euclidean', False, reconstructionNRMSE_euclidean);
+    Individual.addMetrics('fbp_nrmse_mean',      False, reconstructionNRMSE_mean);
+    Individual.addMetrics('fbp_nrmse_min_max',   False, reconstructionNRMSE_minMax);
+    Individual.addMetrics('fbp_psnr',            True,  reconstructionPSNR);
+    Individual.addMetrics('fbp_ncc',             True,  reconstructionNCC);
+
     return (fly_algorithm);
 
 
@@ -350,11 +437,17 @@ class SubplotAnimation(animation.TimedAnimation):
         g_fly_algorithm.evolveGeneration()
         g_number_of_generations += 1;
         
+        for individual in g_fly_algorithm.getPopulation():
+            output = printIndividual(individual);
+            g_output_metrics_file.write(output + '\n');         
+        
+        
         # Print the best individual
-        g_fly_algorithm.getBestIndividual().print()
-
+        best_individual = g_fly_algorithm.getBestIndividual()
+        best_individual.print()
+        
         # Get its genes
-        best_individual_s_genes = g_fly_algorithm.getBestIndividual().m_p_gene_set;
+        best_individual_s_genes = g_fly_algorithm.getBestIndividual().getGeneSet();
 
         # Reset the geometry using them
         setGeometry(best_individual_s_genes);
@@ -418,7 +511,7 @@ class SubplotAnimation(animation.TimedAnimation):
             
             self.fig.set_tight_layout(True)
 
-            print('fig size: {0} DPI, size in inches {1}'.format(self.fig.get_dpi(), self.fig.get_size_inches()))
+            #print('fig size: {0} DPI, size in inches {1}'.format(self.fig.get_dpi(), self.fig.get_size_inches()))
             #self.axarr[0,3].get_xaxis().set_visible(False)
             #self.axarr[1,3].get_xaxis().set_visible(False)
 
@@ -473,6 +566,55 @@ class SubplotAnimation(animation.TimedAnimation):
         return iter(range(NUMBER_OF_GENERATIONS * (NUMBER_OF_MITOSIS + 1)))
 
 
+def printIndividual(individual):
+    global g_number_of_generations;
+    global g_reference_sinogram;
+    global g_normalised_sinogram;
+    global g_reference_CT;
+    global g_normalised_CT;
+    
+    output = "";
+    output += str(g_number_of_generations) + ',';
+    output += str(individual.getID()) + ',';
+    
+    for i in range(Individual.getNumberOfGenes()):
+        output += str(individual.getGene(i)) + ',';
+
+    output += str(individual.computeFitness()) + ',';
+    sinogram_ssim            = measure.compare_ssim( g_reference_sinogram, g_normalised_sinogram);
+    sinogram_mse             = measure.compare_mse(  g_reference_sinogram, g_normalised_sinogram);
+    sinogram_nrmse_euclidean = measure.compare_nrmse(g_reference_sinogram, g_normalised_sinogram, 'Euclidean');
+    sinogram_nrmse_mean      = measure.compare_nrmse(g_reference_sinogram, g_normalised_sinogram, 'mean');
+    sinogram_nrmse_min_max   = measure.compare_nrmse(g_reference_sinogram, g_normalised_sinogram, 'min-max');
+    sinogram_psnr            = measure.compare_psnr( g_reference_sinogram, g_normalised_sinogram, g_reference_sinogram.max() - g_reference_sinogram.min());
+    sinogram_ncc             = np.multiply(          g_reference_sinogram, g_normalised_sinogram).mean();
+    fbp_ssim                 = measure.compare_ssim( g_reference_CT, g_normalised_CT);
+    fbp_mse                  = measure.compare_mse(  g_reference_CT, g_normalised_CT);
+    fbp_nrmse_euclidean      = measure.compare_nrmse(g_reference_CT, g_normalised_CT, 'Euclidean');
+    fbp_nrmse_mean           = measure.compare_nrmse(g_reference_CT, g_normalised_CT, 'mean');
+    fbp_nrmse_min_max        = measure.compare_nrmse(g_reference_CT, g_normalised_CT, 'min-max');
+    fbp_psnr                 = measure.compare_psnr( g_reference_CT, g_normalised_CT, g_reference_CT.max() - g_reference_CT.min());
+    fbp_ncc                  = np.multiply(          g_reference_CT, g_normalised_CT).mean();
+
+    
+    output += str(sinogram_ssim) + ',';
+    output += str(sinogram_mse) + ',';
+    output += str(sinogram_nrmse_euclidean) + ',';
+    output += str(sinogram_nrmse_mean) + ',';
+    output += str(sinogram_nrmse_min_max) + ',';
+    output += str(sinogram_psnr) + ',';
+    output += str(sinogram_ncc) + ',';
+    
+    output += str(fbp_ssim) + ',';
+    output += str(fbp_mse) + ',';
+    output += str(fbp_nrmse_euclidean) + ',';
+    output += str(fbp_nrmse_mean) + ',';
+    output += str(fbp_nrmse_min_max) + ',';
+    output += str(fbp_psnr) + ',';
+    output += str(fbp_ncc) + ',';
+    
+    return output;
+    
    
 ################################################################################
 # Run the script
@@ -480,6 +622,7 @@ class SubplotAnimation(animation.TimedAnimation):
 
 #try:
 if True:
+
 
     # Initialise the X-ray system and optimisation algorithm
     ani = SubplotAnimation()
@@ -496,85 +639,40 @@ if True:
     metadata = dict(title='Rectangle registration using gVirtualXRay', artist='Dr. F. P. Vidal', comment='Video created to illustrate the capabilities of gVirtualXRay in my talk at IBFEM-4i.')
     writer = animation.FFMpegWriter(fps=1, codec='rawvideo', metadata=metadata)
     
+    header = "generation #,individual #,";
+    
+    for i in range(Individual.getNumberOfGenes()):
+        header += Individual.getGeneLabel(i) + ',';
+
+    header += 'fitness,';
+    header += 'sinogram_ssim,';
+    header += 'sinogram_mse,';
+    header += 'sinogram_nrmse_euclidean,';
+    header += 'sinogram_nrmse_mean,';
+    header += 'sinogram_nrmse_min_max,';
+    header += 'sinogram_psnr,';
+    header += 'sinogram_ncc,';
+
+    header += 'fbp_ssim,';
+    header += 'fbp_mse,';
+    header += 'fbp_nrmse_euclidean,';
+    header += 'fbp_nrmse_mean,';
+    header += 'fbp_nrmse_min_max,';
+    header += 'fbp_psnr,';
+    header += 'fbp_ncc,';
+
+    g_output_metrics_file.write(header + '\n');
+
+    for individual in g_fly_algorithm.getPopulation():
+        output = printIndividual(individual);
+        g_output_metrics_file.write(output + '\n'); 
+
     # Run the animation and save in a file
-    ani.save('basic_animation.gif', fps=1, writer='imagemagick', metadata=metadata);
+    #ani.save('basic_animation_ssim.gif', fps=1, writer='imagemagick', metadata=metadata);
     
     # Run the animation
-    #plt.show()
+    plt.show()
     
-    exit()
+    g_output_metrics_file.close();
     
-    # Print the best individual
-    g_fly_algorithm.getBestIndividual().print()
-
-    # Get its genes
-    best_individual_s_genes = g_fly_algorithm.getBestIndividual().m_p_gene_set;
-
-    # Reset the geometry using them
-    setGeometry(best_individual_s_genes);
-    
-    # Create the corresponding sinogram
-    sinogram = computeSinogram();
-    np.savetxt("sinogram_gvxr.txt", sinogram);
-        
-    # Display the 3D scene (no event loop)
-    gvxr.displayScene();
-
-    # Reconstruct it using the FBP algorithm
-    theta = np.linspace(0., angular_span_in_degrees, number_of_projections, endpoint=False);
-    reconstruction_fbp = iradon(sinogram.T, theta=theta, circle=True);
-    np.savetxt("reconstruction_gvxr_fbp.txt", reconstruction_fbp);
-        
-    # Normalise the sinogram and the reconstruction
-    normalised_sinogram = (sinogram - sinogram.mean()) / sinogram.std();
-    normalised_CT       = (reconstruction_fbp - reconstruction_fbp.mean()) / reconstruction_fbp.std()    ;
-    
-    # Display the 3D scene (no event loop)
-    # Run an interactive loop 
-    # (can rotate the 3D scene and zoom-in)
-    # Keys are:
-    # Q/Escape: to quit the event loop (does not close the window)
-    # B: display/hide the X-ray beam
-    # W: display the polygon meshes in solid or wireframe
-    # N: display the X-ray image in negative or positive
-    # H: display/hide the X-ray detector
-    # V: display/hide the normal vectors
-    gvxr.renderLoop();
-
-    
-    
-    
-    
-    
-    
-    
-    exit();
-    
-    
-        
-
-
-
-    anim = animation.FuncAnimation(g_fig, animate, frames=NUMBER_OF_GENERATIONS, blit=True);
-    anim.save('basic_animation.avi', fps=30, extra_args=['-vcodec', 'libx264'], writer='ffmpeg');
-    plt.show();
-    exit();
-    
-    
-
-
-
-
-#except Exception as error:
-#    print ("Exception caught:");
-#    exc_type, exc_obj, exc_tb = sys.exc_info()
-#    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-#    print("\t", exc_type, fname, exc_tb.tb_lineno)
-
-    
-exit()
-
-
-# Scene geometrical properties
-# See Figure 2.1 on Page 15 of Modelling the response of X-ray detectors and removing artefacts in 3D tomography
 
