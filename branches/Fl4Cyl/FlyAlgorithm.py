@@ -127,6 +127,13 @@ class FlyAlgorithm:
 
         # The local fitnesses are not up-to-date
         self.__fitness_up_to_date = False;
+        self.computePopulationFitnesses();
+
+    def getLocalFitnessSet(self):
+        return self.__p_local_fitness;
+
+    def getSortedIndexSet(self):
+        return self.__sort_index;
 
     def getNumberOfIndividuals(self):
         return (len(self.__population));
@@ -142,8 +149,7 @@ class FlyAlgorithm:
             
             # There is more than 1 individual
             if self.getPopulationSize() > 1:
-                elitism_total = max(1, math.floor(self.__elitism_probability * self.getPopulationSize()));
-        
+                elitism_total = max(1, math.floor(self.__elitism_probability * self.getPopulationSize()));        
         
         # Create n new generations of offspring
         for i in range(n):
@@ -166,11 +172,10 @@ class FlyAlgorithm:
                         p_offspring.append(Individual(j, self.getIndividual(j)));
                         #print(j, "i s good.");
 
+
                 elif j < elitism_total:
                     has_used_elitism = True
                     p_offspring.append(Individual(j, self.getIndividual(self.__sort_index[self.getPopulationSize() - j - 1])));
-                    
-
 
                 # Select a genetic operator
                 if not has_used_elitism:
@@ -197,6 +202,7 @@ class FlyAlgorithm:
             # Replace the parents by the offspring
             self.__population = copy.deepcopy(p_offspring);
             self.__fitness_up_to_date = False;
+            self.computePopulationFitnesses();
         
     def evolveSteadyState(self, n = 1):
     
@@ -356,11 +362,23 @@ class FlyAlgorithm:
         
     def getBestIndividualId(self):
         self.computePopulationFitnesses();
-        return self.__sort_index[self.getPopulationSize() - 1];
+        
+        for i in range(self.getPopulationSize(), 0, -1):
+            if self.__population[self.__sort_index[i - 1]].isActive():
+                return (self.__sort_index[i - 1]);
+
+        return -1;
+        #return self.__sort_index[self.getPopulationSize() - 1];
         
     def getWorseIndividualId(self):
         self.computePopulationFitnesses();
-        return self.__sort_index[0];
+
+        for i in range(self.getPopulationSize()):
+            if self.__population[self.__sort_index[i]].isActive():
+                return (self.__sort_index[i]);
+
+        return -1;
+        #return self.__sort_index[0];
                 
     def getBestIndividual(self):
         self.computePopulationFitnesses();
@@ -378,7 +396,7 @@ class FlyAlgorithm:
 
     def sharing(self, i1, i2, aRadius):
         distance = 0.0;
-        for g1, g2 in zip(self.getIndividual(i1).m_p_gene_set, self.getIndividual(i2).m_p_gene_set):
+        for g1, g2 in zip(self.getIndividual(i1).getGeneSet(), self.getIndividual(i2).getGeneSet()):
             distance += (g1 - g2) * (g1 - g2);
 
         distance = math.sqrt(distance);
