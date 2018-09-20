@@ -9,7 +9,7 @@ import os
 import numpy as np
 
 # Import the X-ray simulation library
-import gvxrPython as gvxr
+import gvxrPython3 as gvxr
 
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
@@ -85,9 +85,9 @@ matrix_material = [("Ti", 0.9), ("Al", 0.06), ("V", 0.04)];
 matrix_mu = 13.1274; # cm-1
 matrix_density = 4.42 # g/cm3
 
-g_fiber_geometry  = gvxr.emptyMesh();
-g_core_geometry   = gvxr.emptyMesh();
-g_matrix_geometry = gvxr.emptyMesh();
+#g_fiber_geometry  = gvxr.emptyMesh();
+#g_core_geometry   = gvxr.emptyMesh();
+#g_matrix_geometry = gvxr.emptyMesh();
 
 g_reference_CT        = np.zeros(1);
 g_reference_sinogram  = np.zeros(1);
@@ -182,7 +182,7 @@ def localFitnessFunction(ind_id, genes, aFlyAlgorithm):
     test_image = iradon(sinogram.T, theta=theta, circle=True);
     
     # Display the 3D scene (no event loop)
-    gvxr.displayScene();
+    #gvxr.displayScene();
 
     g_normalised_sinogram = (sinogram - sinogram.mean()) / sinogram.std();
     g_normalised_CT       = (test_image       - test_image.mean())       / test_image.std();
@@ -277,18 +277,22 @@ def setGeometry(apGeneSet):
 
     global g_matrix_geometry;
    
+    gvxr.removePolygonMeshes();
+    
+    
     # Matrix
     # Make a cube
     w = apGeneSet[2] * detector_width_in_pixels * pixel_size_in_micrometer / 1.5;
     h = apGeneSet[3] * detector_width_in_pixels * pixel_size_in_micrometer / 1.5;
-    g_matrix_geometry = gvxr.makeCube(1, "micrometer");
-    g_matrix_geometry.rotate(0, 1, 0, apGeneSet[4] * 360.0);
-    g_matrix_geometry.scale(w, 815, h);
 
     x = apGeneSet[0] * detector_width_in_pixels * pixel_size_in_micrometer - detector_width_in_pixels * pixel_size_in_micrometer / 2.0;
     y = apGeneSet[1] * detector_width_in_pixels * pixel_size_in_micrometer - detector_width_in_pixels * pixel_size_in_micrometer / 2.0;
 
-    g_matrix_geometry.translate(y, 0, x, "micrometer");
+    g_matrix_geometry = gvxr.makeCube("Matrix", 1, "micrometer");
+    gvxr.addPolygonMeshAsInnerSurface("Matrix");        
+    gvxr.rotateNode("Matrix", 0, 1, 0, apGeneSet[4] * 360.0);
+    gvxr.scaleNode("Matrix", w, 815, h, "mm");
+    gvxr.translateNode("Matrix", y, 0, x, "micrometer");
     
     #print(apGeneSet);
     #print(x, y, w, h, apGeneSet[4])
@@ -297,10 +301,10 @@ def setGeometry(apGeneSet):
     # Matrix
     #temp1.setMaterial(matrix_material);
     #temp1.setDensity(matrix_density, "g.cm-3");
-    g_matrix_geometry.setLinearAttenuationCoefficient(matrix_mu, "cm-1");
+    gvxr.setLinearAttenuationCoefficient("Matrix", matrix_mu, "cm-1");
 
-    gvxr.removePolygonMeshes();
-    gvxr.addPolygonMeshAsInnerSurface(g_matrix_geometry, "Matrix");
+
+
 
 
 
@@ -322,7 +326,7 @@ def computeSinogram():
         # Rotate the scene
         
         # Compute the X-ray projection and save the numpy image
-        np_image = gvxr.computeXRayImage();
+        np_image = np.array(gvxr.computeXRayImage());
         
         # Display the 3D scene (no event loop)
         #gvxr.displayScene();
@@ -391,7 +395,7 @@ class SubplotAnimation(animation.TimedAnimation):
 
         # Create an OpenGL context
         print("Create an OpenGL context")
-        gvxr.createWindow();
+        gvxr.createOpenGLContext();
         gvxr.setWindowSize(512, 512);
 
         # Create a Fly Algorithm instance
