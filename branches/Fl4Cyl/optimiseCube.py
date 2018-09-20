@@ -137,7 +137,7 @@ def sinogramNRMSE_minMax():
     return measure.compare_nrmse(g_reference_sinogram, g_normalised_sinogram, 'min-max');
 
 def sinogramPSNR():
-    return measure.compare_psnr(g_reference_sinogram, g_normalised_sinogram);
+    return measure.compare_psnr(g_reference_sinogram, g_normalised_sinogram, g_reference_sinogram.max() - g_reference_sinogram.min());
 
 def sinogramNCC():
     return np.multiply(g_reference_sinogram, g_normalised_sinogram).mean();
@@ -159,7 +159,7 @@ def reconstructionNRMSE_minMax():
     return measure.compare_nrmse(g_reference_CT, g_normalised_CT, 'min-max');
 
 def reconstructionPSNR():
-    return measure.compare_psnr(g_reference_CT, g_normalised_CT);
+    return measure.compare_psnr(g_reference_CT, g_normalised_CT, g_reference_CT.max() - g_reference_CT.min());
 
 def reconstructionNCC():
     return np.multiply(g_reference_CT, g_normalised_CT).mean();
@@ -190,13 +190,13 @@ def localFitnessFunction(ind_id, genes, aFlyAlgorithm):
 
     g_number_of_evaluations += 1;
     
-    aFlyAlgorithm.getIndividual().computeMetrics();
+    aFlyAlgorithm.getIndividual(ind_id).computeMetrics();
 
        
     # Fitness based on NCC
     #ncc =  np.multiply(g_reference_sinogram, g_normalised_sinogram).mean();
     #ncc =  np.multiply(g_reference_CT, g_normalised_CT).mean();
-    ncc = -aFlyAlgorithm.getIndividual().getMetrics(1);
+    ncc = aFlyAlgorithm.getIndividual(ind_id).getMetrics(6);
 
     if g_first_run:
         np.savetxt("sinogram_gvxr.txt", g_normalised_sinogram);
@@ -581,20 +581,20 @@ def printIndividual(individual):
         output += str(individual.getGene(i)) + ',';
 
     output += str(individual.computeFitness()) + ',';
-    sinogram_ssim            = measure.compare_ssim( g_reference_sinogram, g_normalised_sinogram);
-    sinogram_mse             = measure.compare_mse(  g_reference_sinogram, g_normalised_sinogram);
-    sinogram_nrmse_euclidean = measure.compare_nrmse(g_reference_sinogram, g_normalised_sinogram, 'Euclidean');
-    sinogram_nrmse_mean      = measure.compare_nrmse(g_reference_sinogram, g_normalised_sinogram, 'mean');
-    sinogram_nrmse_min_max   = measure.compare_nrmse(g_reference_sinogram, g_normalised_sinogram, 'min-max');
-    sinogram_psnr            = measure.compare_psnr( g_reference_sinogram, g_normalised_sinogram, g_reference_sinogram.max() - g_reference_sinogram.min());
-    sinogram_ncc             = np.multiply(          g_reference_sinogram, g_normalised_sinogram).mean();
-    fbp_ssim                 = measure.compare_ssim( g_reference_CT, g_normalised_CT);
-    fbp_mse                  = measure.compare_mse(  g_reference_CT, g_normalised_CT);
-    fbp_nrmse_euclidean      = measure.compare_nrmse(g_reference_CT, g_normalised_CT, 'Euclidean');
-    fbp_nrmse_mean           = measure.compare_nrmse(g_reference_CT, g_normalised_CT, 'mean');
-    fbp_nrmse_min_max        = measure.compare_nrmse(g_reference_CT, g_normalised_CT, 'min-max');
-    fbp_psnr                 = measure.compare_psnr( g_reference_CT, g_normalised_CT, g_reference_CT.max() - g_reference_CT.min());
-    fbp_ncc                  = np.multiply(          g_reference_CT, g_normalised_CT).mean();
+    sinogram_ssim            = individual.getMetrics(0);
+    sinogram_mse             = individual.getMetrics(1);
+    sinogram_nrmse_euclidean = individual.getMetrics(2);
+    sinogram_nrmse_mean      = individual.getMetrics(3);
+    sinogram_nrmse_min_max   = individual.getMetrics(4);
+    sinogram_psnr            = individual.getMetrics(5);
+    sinogram_ncc             = individual.getMetrics(6);
+    fbp_ssim                 = individual.getMetrics(7);
+    fbp_mse                  = individual.getMetrics(8);
+    fbp_nrmse_euclidean      = individual.getMetrics(9);
+    fbp_nrmse_mean           = individual.getMetrics(10);
+    fbp_nrmse_min_max        = individual.getMetrics(11);
+    fbp_psnr                 = individual.getMetrics(12);
+    fbp_ncc                  = individual.getMetrics(13);
 
     
     output += str(sinogram_ssim) + ',';
@@ -668,10 +668,10 @@ if True:
         g_output_metrics_file.write(output + '\n'); 
 
     # Run the animation and save in a file
-    #ani.save('basic_animation_ssim.gif', fps=1, writer='imagemagick', metadata=metadata);
+    ani.save('basic_animation_ssim.gif', fps=1, writer='imagemagick', metadata=metadata);
     
     # Run the animation
-    plt.show()
+    #plt.show()
     
     g_output_metrics_file.close();
     
