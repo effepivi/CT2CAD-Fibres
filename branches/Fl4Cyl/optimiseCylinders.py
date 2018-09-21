@@ -9,7 +9,7 @@ import os
 import numpy as np
 
 # Import the X-ray simulation library
-import gvxrPython as gvxr
+import gvxrPython3 as gvxr
 
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
@@ -86,12 +86,10 @@ matrix_material = [("Ti", 0.9), ("Al", 0.06), ("V", 0.04)];
 matrix_mu = 13.1274; # cm-1
 matrix_density = 4.42 # g/cm3
 
-g_fiber_geometry  = gvxr.emptyMesh();
-g_core_geometry   = gvxr.emptyMesh();
-g_matrix_geometry = gvxr.emptyMesh();
-
-g_reference_CT       = np.zeros(1);
-g_reference_sinogram = np.zeros(1);
+g_reference_CT        = np.zeros(1);
+g_reference_sinogram  = np.zeros(1);
+g_normalised_CT       = np.zeros(1);
+g_normalised_sinogram = np.zeros(1);
 
 g_fiber_geometry_set = [];
 g_core_geometry_set  = [];
@@ -106,6 +104,8 @@ g_best_ncc = 0;
 
 g_best_ncc_sinogram = [];
 g_best_ncc_CT_slice = [];
+
+g_first_run = True;
 
 
 ########
@@ -160,24 +160,29 @@ def globalFitnessFunction(aPopulation, resetAll = True):
     global g_best_ncc;
     global g_number_of_evaluations;
     global g_best_population;
-
-    setGeometry(aPopulation, resetAll);    
+    global g_reference_sinogram;
+    global g_reference_CT;
+    global g_normalised_sinogram;
+    global g_normalised_CT;
+    global g_first_run;
+    
+    setCylinders(aPopulation, resetAll);    
     sinogram = computeSinogram();
     
     theta = np.linspace(0., angular_span_in_degrees, number_of_projections, endpoint=False);
     test_image = iradon(sinogram.T, theta=theta, circle=True);
     
 
-    normalised_sinogram = normaliseImage(sinogram);
-    normalised_CT = normaliseImage(test_image);
+    g_normalised_sinogram = normaliseImage(sinogram);
+    g_normalised_CT = normaliseImage(test_image);
     #normalised_sinogram = (sinogram - sinogram.mean()) / sinogram.std();
     #normalised_CT       = (test_image       - test_image.mean())       / test_image.std();
 
     g_number_of_evaluations += 1;
     
     # Fitness based on NCC
-    ncc_sinogram =  productImage(g_reference_sinogram, normalised_sinogram).mean();
-    ncc_CT       =  productImage(g_reference_CT, normalised_CT).mean();
+    ncc_sinogram =  productImage(g_reference_sinogram, g_normalised_sinogram).mean();
+    ncc_CT       =  productImage(g_reference_CT, g_normalised_CT).mean();
 
     ncc = (ncc_sinogram + ncc_CT) / 2.0;
     ncc = ncc_CT * ncc_sinogram;
@@ -187,13 +192,18 @@ def globalFitnessFunction(aPopulation, resetAll = True):
     # Display the 3D scene (no event loop)
     #gvxr.displayScene();
 
-    if g_best_ncc < ncc:
-        
-        np.savetxt("sinogram_gvxr.txt", normalised_sinogram);
-        np.savetxt("CT_gvxr.txt",       normalised_CT);
+    if g_first_run:
+        np.savetxt("sinogram_cylinders_gvxr.txt", g_normalised_sinogram);
+        np.savetxt("CT_cylinders_gvxr.txt",       g_normalised_CT);
         g_best_ncc = ncc;
-        #print(number_of_evaluations, ncc*100, genes)
+        g_first_run = False;
         g_best_population = copy.deepcopy(aPopulation);
+    elif g_best_ncc < ncc:
+        np.savetxt("sinogram_cylinders_gvxr.txt", g_normalised_sinogram);
+        np.savetxt("CT_cylinders_gvxr.txt",       g_normalised_CT);
+        g_best_ncc = ncc;
+        g_best_population = copy.deepcopy(aPopulation);
+
     
     # Fitness based on NCC
     return (ncc);
@@ -368,19 +378,13 @@ def cleanCloseFlies(aFlag):
                                         #has_killed = True;
                                         #print ("Killing");
 
-                                #setGeometry(g_fly_algorithm.getPopulation(), True);    
+                                #setCylinders(g_fly_algorithm.getPopulation(), True);    
                                 #gvxr.displayScene();
 
     print ("Cleaning close flies: done");
 
-def setGeometry(aPopuation, resetAll = True):
+def setCylinders(aPopuation, resetAll = True):
 
-    global g_fiber_geometry;
-    global g_core_geometry;
-    global g_matrix_geometry;
-    global g_fiber_geometry_set;
-    global g_core_geometry_set;
-   
     global g_matrix_width;
     global g_matrix_height;
     global g_matrix_x;
@@ -393,45 +397,35 @@ def setGeometry(aPopuation, resetAll = True):
     if resetAll:
         g_fiber_geometry_set = [];
         g_core_geometry_set  = [];
+
+        gvxr.emptyMesh("g_fiber_geometry");
+        gvxr.emptyMesh("g_core_geometry");    
     
         for individual in aPopuation:
 
-            g_fiber_geometry_set.append(gvxr.makeCylinder(100, 815, fiber_radius, "micrometer"))
-            g_core_geometry_set.append( gvxr.makeCylinder(100, 815,  core_radius, "micrometer"))
             x = g_matrix_x + (individual.getGene(0) - 0.5) * max(g_matrix_width, g_matrix_height) * 2.0;
             y = g_matrix_y + (individual.getGene(1) - 0.5) * max(g_matrix_width, g_matrix_height) * 2.0;
+            
+            gvxr.makeCylinder("temp_fibre", 100, 815, fiber_radius, "micrometer");
+            gvxr.makeCylinder("temp_core", 100, 815,  core_radius, "micrometer");
 
-            #print (x, " ", y);
-            g_fiber_geometry_set[-1].translate(y, 0, x, "micrometer");
-            g_core_geometry_set[ -1].translate(y, 0, x, "micrometer");    
-    
-    fiber_geometry_set = [];
-    core_geometry_set  = [];
-    
-    for i in range(len(aPopuation)):
-    
-        if aPopuation[i].isActive():
-            fiber_geometry_set.append(g_fiber_geometry_set[i])
-            core_geometry_set.append(g_core_geometry_set[i])
+            gvxr.translateNode("temp_fibre", y, 0, x, "micrometer");
+            gvxr.translateNode("temp_core", y, 0, x, "micrometer");
+            
+            gvxr.addMesh("g_fiber_geometry", "temp_fibre");
+            gvxr.addMesh("g_core_geometry",  "temp_core");
+            
+    gvxr.emptyMesh("fiber_geometry");
+    gvxr.emptyMesh("core_geometry");
 
-
-
-
-    # Add the geometries
-    fiber_geometry = gvxr.emptyMesh();
-    g_core_geometry = gvxr.emptyMesh();
-
-    for fiber in fiber_geometry_set:
-        fiber_geometry += fiber;
-
-    for core in core_geometry_set:
-        g_core_geometry += core;
+    gvxr.addMesh("fiber_geometry", "g_fiber_geometry");
+    gvxr.addMesh("core_geometry",  "g_core_geometry");
 
     #fiber_geometry.saveSTLFile("fiber.stl");
     #core_geometry.saveSTLFile("core.stl");
 
     #g_matrix_geometry = matrix_geometry - fiber_geometry;
-    g_fiber_geometry  = fiber_geometry  - g_core_geometry;
+    gvxr.subtractMesh("fiber_geometry", "core_geometry")
 
     # Matrix
     #temp1.setMaterial(matrix_material);
@@ -441,17 +435,17 @@ def setGeometry(aPopuation, resetAll = True):
     # Fiber
     #temp2.setMaterial(fiber_material);
     #temp2.setDensity(fiber_density, "g.cm-3");
-    g_fiber_geometry.setLinearAttenuationCoefficient(fiber_mu, "cm-1");
+    gvxr.setLinearAttenuationCoefficient("fiber_geometry", fiber_mu, "cm-1");
 
     # Core
     #core_geometry.setMaterial(core_material);
     #core_geometry.setDensity(core_density, "g.cm-3");
-    g_core_geometry.setLinearAttenuationCoefficient(core_mu, "cm-1");
+    gvxr.setLinearAttenuationCoefficient("core_geometry", core_mu, "cm-1");
 
-    gvxr.removePolygonMeshes();
-    gvxr.addPolygonMeshAsOuterSurface(g_matrix_geometry, "Matrix");
-    gvxr.addPolygonMeshAsInnerSurface(g_fiber_geometry, "Fiber");
-    gvxr.addPolygonMeshAsInnerSurface(g_core_geometry, "Core");
+    gvxr.removePolygonMeshesFromXRayRenderer();
+    gvxr.addPolygonMeshAsOuterSurface("Matrix");
+    gvxr.addPolygonMeshAsInnerSurface("fiber_geometry");
+    gvxr.addPolygonMeshAsInnerSurface("core_geometry");
 
 
 
@@ -471,7 +465,7 @@ def computeSinogram():
         # Rotate the scene
         
         # Compute the X-ray projection and save the numpy image
-        np_image = gvxr.computeXRayImage();
+        np_image = np.array(gvxr.computeXRayImage());
         
         # Display the 3D scene (no event loop)
         #gvxr.displayScene();
@@ -587,7 +581,7 @@ class SubplotAnimation(animation.TimedAnimation):
         g_fly_algorithm.evolveGeneration();
         gvxr.displayScene();
         
-        setGeometry(g_fly_algorithm.getPopulation(), True);    
+        setCylinders(g_fly_algorithm.getPopulation(), True);    
         sinogram = computeSinogram();
         gvxr.displayScene();
     
@@ -615,8 +609,8 @@ class SubplotAnimation(animation.TimedAnimation):
         ####best_individual_s_genes = g_fly_algorithm.getBestIndividual().m_p_gene_set;
 
         # Reset the geometry using them
-        #setGeometry(g_best_population, True);
-        setGeometry(g_fly_algorithm.getPopulation(), True);
+        #setCylinders(g_best_population, True);
+        setCylinders(g_fly_algorithm.getPopulation(), True);
         gvxr.displayScene();
         
         # Create the corresponding sinogram
@@ -747,32 +741,22 @@ class SubplotAnimation(animation.TimedAnimation):
 
 def setMatrix(apGeneSet):
 
-    global g_matrix_geometry;
-   
     # Matrix
     # Make a cube
     w = apGeneSet[2] * detector_width_in_pixels * pixel_size_in_micrometer / 1.5;
     h = apGeneSet[3] * detector_width_in_pixels * pixel_size_in_micrometer / 1.5;
-    g_matrix_geometry = gvxr.makeCube(1, "micrometer");
-    g_matrix_geometry.rotate(0, 1, 0, apGeneSet[4] * 360.0);
-    g_matrix_geometry.scale(w, 815, h);
 
     x = apGeneSet[0] * detector_width_in_pixels * pixel_size_in_micrometer - detector_width_in_pixels * pixel_size_in_micrometer / 2.0;
     y = apGeneSet[1] * detector_width_in_pixels * pixel_size_in_micrometer - detector_width_in_pixels * pixel_size_in_micrometer / 2.0;
 
-    g_matrix_geometry.translate(y, 0, x, "micrometer");
+    gvxr.makeCube("Matrix", 1, "micrometer");
+    gvxr.addPolygonMeshAsInnerSurface("Matrix");        
+    gvxr.rotateNode("Matrix", 0, 1, 0, apGeneSet[4] * 360.0);
+    gvxr.scaleNode("Matrix", w, 815, h, "mm");
+    gvxr.translateNode("Matrix", y, 0, x, "micrometer");
     
-    #print(apGeneSet);
-    #print(x, y, w, h, apGeneSet[4])
-    #print();
-    
-    # Matrix
-    #temp1.setMaterial(matrix_material);
-    #temp1.setDensity(matrix_density, "g.cm-3");
-    g_matrix_geometry.setLinearAttenuationCoefficient(matrix_mu, "cm-1");
+    gvxr.setLinearAttenuationCoefficient("Matrix", matrix_mu, "cm-1");
 
-    gvxr.removePolygonMeshes();
-    gvxr.addPolygonMeshAsInnerSurface(g_matrix_geometry, "Matrix");
 
    
 ################################################################################
@@ -788,8 +772,11 @@ if True:
 
 
     #best_individual_s_genes = [0.5859774174670042, 0.3244259243528434, 0.6062948701961279, 0.46512532982794313, 0.36295507347649336];
-    best_individual_s_genes = [0.5862890780780811, 0.330976492941764, 0.6185064030596172, 0.3813500904639961, 1.0901447493220267];
-    best_individual_s_genes = [0.5744659660830413, 0.34122547300761086, 0.5399103790120158, 0.5005289054771243, 0.3716677835584586];
+    #best_individual_s_genes = [0.5862890780780811, 0.330976492941764, 0.6185064030596172, 0.3813500904639961, 1.0901447493220267];
+    #best_individual_s_genes = [0.5744659660830413, 0.34122547300761086, 0.5399103790120158, 0.5005289054771243, 0.3716677835584586];
+    
+    best_individual_s_genes = [0.6088925283126014, 0.33814355531109763, 0.6622725678309, 0.584535159378608, 0.500262379003001]; # NCC = 0.9480978675194939
+    
     setMatrix(best_individual_s_genes);
     
     g_matrix_width  = best_individual_s_genes[2] * detector_width_in_pixels * pixel_size_in_micrometer / 1.5;
@@ -797,11 +784,11 @@ if True:
     g_matrix_x = best_individual_s_genes[0] * detector_width_in_pixels * pixel_size_in_micrometer - detector_width_in_pixels * pixel_size_in_micrometer / 2.0;
     g_matrix_y = best_individual_s_genes[1] * detector_width_in_pixels * pixel_size_in_micrometer - detector_width_in_pixels * pixel_size_in_micrometer / 2.0;
 
-    #setGeometry(g_fly_algorithm.getPopulation(), True);
+    #setCylinders(g_fly_algorithm.getPopulation(), True);
     #gvxr.renderLoop();
 
     #cleanCloseFlies(True);
-    setGeometry(g_fly_algorithm.getPopulation(), True);
+    setCylinders(g_fly_algorithm.getPopulation(), True);
     
     #plt.rcParams['animation.ffmpeg_path'] = '/usr/bin/ffmpeg'
     #plt.rcParams['animation.ffmpeg_args'] = '-report'
@@ -845,7 +832,7 @@ if True:
     g_fly_algorithm.setPopulation(copy.deepcopy(g_best_population));
 
 
-    setGeometry(g_fly_algorithm.getPopulation(), True);    
+    setCylinders(g_fly_algorithm.getPopulation(), True);    
     sinogram = computeSinogram();
     gvxr.displayScene();
     
@@ -868,7 +855,7 @@ if True:
 
     cleanBadFlies(False);
 
-    setGeometry(g_fly_algorithm.getPopulation(), False);    
+    setCylinders(g_fly_algorithm.getPopulation(), False);    
     sinogram = computeSinogram();
     gvxr.displayScene();
     
@@ -894,7 +881,7 @@ if True:
 
     cleanCloseFlies(False);
 
-    setGeometry(g_fly_algorithm.getPopulation(), False);    
+    setCylinders(g_fly_algorithm.getPopulation(), False);    
     sinogram = computeSinogram();
     gvxr.displayScene();
     
@@ -944,59 +931,3 @@ if True:
    
     exit(); 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    # Display the 3D scene (no event loop)
-    killBadFlies();
-    gvxr.displayScene();
-        
-    setGeometry(g_fly_algorithm.getPopulation(), False);    
-    sinogram = computeSinogram();
-    
-    theta = np.linspace(0., angular_span_in_degrees, number_of_projections, endpoint=False);
-    test_image = iradon(sinogram.T, theta=theta, circle=True);
-    
-    normalised_sinogram = normaliseImage(sinogram);
-    normalised_CT = normaliseImage(test_image);
-    #normalised_sinogram = (sinogram - sinogram.mean()) / sinogram.std();
-    #normalised_CT       = (test_image       - test_image.mean())       / test_image.std();
-
-    normalised_sinogram = normaliseImage(sinogram);
-    normalised_CT = normaliseImage(test_image);
-
-    # Fitness based on NCC
-    ncc_sinogram =  productImage(g_reference_sinogram, normalised_sinogram).mean();
-    ncc_CT       =  productImage(g_reference_CT, normalised_CT).mean();
-
-    print("Final\tNCC sinogram: ", 100*ncc_sinogram, "\tNCC CT slice: ", 100*ncc_CT);
-
-    np.savetxt("final_final_sinogram_gvxr.txt", normalised_sinogram);
-    np.savetxt("final_final_CT_gvxr.txt",       normalised_CT);
-
-
-
-
-
-
-    gvxr.renderLoop();
-
-
-    for ind in g_fly_algorithm.getPopulation():
-        if ind.isActive():
-            ind.print();
-
-    exit()
-    

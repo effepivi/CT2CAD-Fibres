@@ -85,10 +85,6 @@ matrix_material = [("Ti", 0.9), ("Al", 0.06), ("V", 0.04)];
 matrix_mu = 13.1274; # cm-1
 matrix_density = 4.42 # g/cm3
 
-#g_fiber_geometry  = gvxr.emptyMesh();
-#g_core_geometry   = gvxr.emptyMesh();
-#g_matrix_geometry = gvxr.emptyMesh();
-
 g_reference_CT        = np.zeros(1);
 g_reference_sinogram  = np.zeros(1);
 g_normalised_CT       = np.zeros(1);
@@ -175,7 +171,7 @@ def localFitnessFunction(ind_id, genes, aFlyAlgorithm):
     global g_first_run;
 
     
-    setGeometry(genes);
+    setMatrix(genes);
     sinogram = computeSinogram();
     
     theta = np.linspace(0., angular_span_in_degrees, number_of_projections, endpoint=False);
@@ -273,13 +269,10 @@ def initXRaySimulator():
     print("angular_step: ", str(angular_step))
     
 
-def setGeometry(apGeneSet):
+def setMatrix(apGeneSet):
 
-    global g_matrix_geometry;
-   
-    gvxr.removePolygonMeshes();
-    
-    
+    gvxr.removePolygonMeshesFromXRayRenderer();
+        
     # Matrix
     # Make a cube
     w = apGeneSet[2] * detector_width_in_pixels * pixel_size_in_micrometer / 1.5;
@@ -288,7 +281,7 @@ def setGeometry(apGeneSet):
     x = apGeneSet[0] * detector_width_in_pixels * pixel_size_in_micrometer - detector_width_in_pixels * pixel_size_in_micrometer / 2.0;
     y = apGeneSet[1] * detector_width_in_pixels * pixel_size_in_micrometer - detector_width_in_pixels * pixel_size_in_micrometer / 2.0;
 
-    g_matrix_geometry = gvxr.makeCube("Matrix", 1, "micrometer");
+    gvxr.makeCube("Matrix", 1, "micrometer");
     gvxr.addPolygonMeshAsInnerSurface("Matrix");        
     gvxr.rotateNode("Matrix", 0, 1, 0, apGeneSet[4] * 360.0);
     gvxr.scaleNode("Matrix", w, 815, h, "mm");
@@ -454,7 +447,7 @@ class SubplotAnimation(animation.TimedAnimation):
         best_individual_s_genes = g_fly_algorithm.getBestIndividual().getGeneSet();
 
         # Reset the geometry using them
-        setGeometry(best_individual_s_genes);
+        setMatrix(best_individual_s_genes);
         
         # Create the corresponding sinogram
         sinogram = computeSinogram();
