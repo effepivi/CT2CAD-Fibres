@@ -28,8 +28,8 @@ from lsf import *
 
 from FlyAlgorithm import *
 
-
-from multiprocessing import Pool
+#import multiprocessing
+#from multiprocessing import Pool
 
 
 
@@ -132,7 +132,8 @@ def f2(x, y):
 def productImage(anImage1, anImage2):
 
     return (np.multiply(anImage1, anImage2));
-    p = Pool(12)
+    
+    p = Pool(multiprocessing.cpu_count())
     return (p.map(f2, (anImage1, anImage2)))
 
 def normaliseImage(anImage):
@@ -144,7 +145,7 @@ def normaliseImage(anImage):
 
     return (anImage-temp_mean)/temp_std
 
-    p = Pool(12)
+    p = Pool(multiprocessing.cpu_count())
     return (p.map(f1, anImage))
     
 
@@ -180,6 +181,8 @@ def globalFitnessFunction(aPopulation, resetAll = True):
 
     ncc = (ncc_sinogram + ncc_CT) / 2.0;
     ncc = ncc_CT * ncc_sinogram;
+    #ncc = ncc_sinogram
+    #ncc = ncc_CT
     
     # Display the 3D scene (no event loop)
     #gvxr.displayScene();
@@ -295,9 +298,31 @@ def killBadFlies():
             g_fly_algorithm.computeGlobalFitness();
 
 
-def clean(aFlag):
+def cleanBadFlies(aFlag):
     global g_fly_algorithm;
-    print ("Cleaning");
+    print ("Cleaning bad flies");
+
+    has_killed = True;
+
+    while has_killed == True:
+        has_killed = False;
+
+        worse_fly = g_fly_algorithm.getWorseIndividualId();
+        worse_fitness = g_fly_algorithm.getLocalFitness(worse_fly);
+
+        if worse_fitness < 0.0:
+            has_killed = True;
+            if aFlag:
+                g_fly_algorithm.kill(worse_fitness);
+            else:
+                g_fly_algorithm.deactivateIndividual(worse_fitness);
+
+    print ("Cleaning bad flies: done");
+
+
+def cleanCloseFlies(aFlag):
+    global g_fly_algorithm;
+    print ("Cleaning close flies");
     has_killed = True;
 
     while has_killed == True:
@@ -346,7 +371,7 @@ def clean(aFlag):
                                 #setGeometry(g_fly_algorithm.getPopulation(), True);    
                                 #gvxr.displayScene();
 
-    print ("Cleaning: done");
+    print ("Cleaning close flies: done");
 
 def setGeometry(aPopuation, resetAll = True):
 
@@ -524,7 +549,7 @@ class SubplotAnimation(animation.TimedAnimation):
 
         # Create the X-ray simulator
         initXRaySimulator();
-        gvxr.enableArtefactFilteringOnGPU();
+        gvxr.enableArtefactFilteringOnCPU();
     
     
     
@@ -562,7 +587,25 @@ class SubplotAnimation(animation.TimedAnimation):
         g_fly_algorithm.evolveGeneration();
         gvxr.displayScene();
         
-        clean(True);
+        setGeometry(g_fly_algorithm.getPopulation(), True);    
+        sinogram = computeSinogram();
+        gvxr.displayScene();
+    
+        theta = np.linspace(0., angular_span_in_degrees, number_of_projections, endpoint=False);
+        test_image = iradon(sinogram.T, theta=theta, circle=True);
+    
+        normalised_sinogram = normaliseImage(sinogram);
+        normalised_CT = normaliseImage(test_image);
+        #normalised_sinogram = (sinogram - sinogram.mean()) / sinogram.std();
+        #normalised_CT       = (test_image       - test_image.mean())       / test_image.std();
+
+        np.savetxt("before_cleaning_sinogram_gvxr.txt", normalised_sinogram);
+        np.savetxt("before_cleaning_CT_gvxr.txt",       normalised_CT);
+
+
+
+
+        cleanCloseFlies(True);
         g_number_of_generations += 1;
         
         # Print the best individual
@@ -588,6 +631,9 @@ class SubplotAnimation(animation.TimedAnimation):
         normalised_CT = normaliseImage(reconstruction_fbp);
         #normalised_sinogram = (sinogram - sinogram.mean()) / sinogram.std();
         #normalised_CT       = (reconstruction_fbp - reconstruction_fbp.mean()) / reconstruction_fbp.std()    
+
+        np.savetxt("after_cleaning_sinogram_gvxr.txt", normalised_sinogram);
+        np.savetxt("after_cleaning_CT_gvxr.txt",       normalised_CT);
 
         # Compute the ZNCCs    
         g_best_ncc_sinogram.append(int(100*productImage(normalised_sinogram, g_reference_sinogram).mean()));
@@ -741,7 +787,9 @@ if True:
 
 
 
-    best_individual_s_genes = [0.5859774174670042, 0.3244259243528434, 0.6062948701961279, 0.46512532982794313, 0.36295507347649336];
+    #best_individual_s_genes = [0.5859774174670042, 0.3244259243528434, 0.6062948701961279, 0.46512532982794313, 0.36295507347649336];
+    best_individual_s_genes = [0.5862890780780811, 0.330976492941764, 0.6185064030596172, 0.3813500904639961, 1.0901447493220267];
+    best_individual_s_genes = [0.5744659660830413, 0.34122547300761086, 0.5399103790120158, 0.5005289054771243, 0.3716677835584586];
     setMatrix(best_individual_s_genes);
     
     g_matrix_width  = best_individual_s_genes[2] * detector_width_in_pixels * pixel_size_in_micrometer / 1.5;
@@ -752,7 +800,7 @@ if True:
     #setGeometry(g_fly_algorithm.getPopulation(), True);
     #gvxr.renderLoop();
 
-    #clean(True);
+    #cleanCloseFlies(True);
     setGeometry(g_fly_algorithm.getPopulation(), True);
     
     #plt.rcParams['animation.ffmpeg_path'] = '/usr/bin/ffmpeg'
@@ -795,9 +843,58 @@ if True:
     #plt.show()
 
     g_fly_algorithm.setPopulation(copy.deepcopy(g_best_population));
-    clean(False);
+
 
     setGeometry(g_fly_algorithm.getPopulation(), True);    
+    sinogram = computeSinogram();
+    gvxr.displayScene();
+    
+    theta = np.linspace(0., angular_span_in_degrees, number_of_projections, endpoint=False);
+    test_image = iradon(sinogram.T, theta=theta, circle=True);
+    
+    normalised_sinogram = normaliseImage(sinogram);
+    normalised_CT = normaliseImage(test_image);
+    #normalised_sinogram = (sinogram - sinogram.mean()) / sinogram.std();
+    #normalised_CT       = (test_image       - test_image.mean())       / test_image.std();
+
+    # Fitness based on NCC
+    ncc_sinogram =  productImage(g_reference_sinogram, normalised_sinogram).mean();
+    ncc_CT       =  productImage(g_reference_CT, normalised_CT).mean();
+
+    print("Before Killing bad flies \tNCC sinogram: ", 100*ncc_sinogram, "\tNCC CT slice: ", 100*ncc_CT);
+
+    np.savetxt("before_killing_bad_flies_sinogram_gvxr.txt", normalised_sinogram);
+    np.savetxt("before_killing_bad_flies_CT_gvxr.txt",       normalised_CT);
+
+    cleanBadFlies(False);
+
+    setGeometry(g_fly_algorithm.getPopulation(), False);    
+    sinogram = computeSinogram();
+    gvxr.displayScene();
+    
+    theta = np.linspace(0., angular_span_in_degrees, number_of_projections, endpoint=False);
+    test_image = iradon(sinogram.T, theta=theta, circle=True);
+    
+    normalised_sinogram = normaliseImage(sinogram);
+    normalised_CT = normaliseImage(test_image);
+    #normalised_sinogram = (sinogram - sinogram.mean()) / sinogram.std();
+    #normalised_CT       = (test_image       - test_image.mean())       / test_image.std();
+
+    # Fitness based on NCC
+    ncc_sinogram =  productImage(g_reference_sinogram, normalised_sinogram).mean();
+    ncc_CT       =  productImage(g_reference_CT, normalised_CT).mean();
+
+    print("After Killing bad flies \tNCC sinogram: ", 100*ncc_sinogram, "\tNCC CT slice: ", 100*ncc_CT);
+
+    np.savetxt("after_killing_bad_flies_sinogram_gvxr.txt", normalised_sinogram);
+    np.savetxt("after_killing_bad_flies_CT_gvxr.txt",       normalised_CT);
+
+
+
+
+    cleanCloseFlies(False);
+
+    setGeometry(g_fly_algorithm.getPopulation(), False);    
     sinogram = computeSinogram();
     gvxr.displayScene();
     
@@ -824,8 +921,44 @@ if True:
     np.savetxt("final_sinogram_gvxr.txt", normalised_sinogram);
     np.savetxt("final_CT_gvxr.txt",       normalised_CT);
 
+    blurred_sinogram = np.zeros(sinogram.shape);
+
+    t = np.arange(-20., 21., 1.);
+    kernel=lsf(t*41)/lsf(0);
+    kernel/=kernel.sum();
+
+    for i in range(sinogram.shape[0]):
+        blurred_sinogram[i]=np.convolve(sinogram[i], kernel, mode='same');
+
+    test_image = iradon(sinogram.T, theta=theta, circle=True);
+    normalised_CT = normaliseImage(test_image);
+
+    np.savetxt("final_lsf_sinogram_gvxr.txt", normalised_sinogram);
+    np.savetxt("final_lsf_CT_gvxr.txt",       normalised_CT);
+
+    for ind in g_fly_algorithm.getPopulation():
+        if ind.isActive():
+            ind.print();
+
     gvxr.renderLoop();
-    
+   
+    exit(); 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     # Display the 3D scene (no event loop)
     killBadFlies();
     gvxr.displayScene();
@@ -852,6 +985,11 @@ if True:
 
     np.savetxt("final_final_sinogram_gvxr.txt", normalised_sinogram);
     np.savetxt("final_final_CT_gvxr.txt",       normalised_CT);
+
+
+
+
+
 
     gvxr.renderLoop();
 
