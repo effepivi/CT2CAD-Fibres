@@ -81,7 +81,7 @@ g_matrix_width = 0;
 g_matrix_height = 0;
 g_matrix_x = 0;
 g_matrix_y = 0;
-matrix_material = [("Ti", 0.9), ("Al", 0.06), ("V", 0.04)];
+matrix_material = "Ti90Al6V4";
 matrix_mu = 13.1274; # cm-1
 matrix_density = 4.42 # g/cm3
 
@@ -287,14 +287,9 @@ def setMatrix(apGeneSet):
     gvxr.scaleNode("Matrix", w, 815, h, "mm");
     gvxr.translateNode("Matrix", y, 0, x, "micrometer");
     
-    #print(apGeneSet);
-    #print(x, y, w, h, apGeneSet[4])
-    #print();
-    
     # Matrix
-    #temp1.setMaterial(matrix_material);
-    #temp1.setDensity(matrix_density, "g.cm-3");
-    gvxr.setLinearAttenuationCoefficient("Matrix", matrix_mu, "cm-1");
+    gvxr.setMixture("Matrix", matrix_material);
+    gvxr.setDensity("Matrix", matrix_density, "g.cm-3");
 
 
 
@@ -617,9 +612,7 @@ def printIndividual(individual):
 # Run the script
 ################################################################################
 
-#try:
-if True:
-
+try:
 
     # Initialise the X-ray system and optimisation algorithm
     ani = SubplotAnimation()
@@ -672,4 +665,10 @@ if True:
     
     g_output_metrics_file.close();
     
+except OSError as err:
+    print("OS error: {0}".format(err))
+except ValueError:
+    print("Could not convert data.")
+except:
+    print("Unexpected error:", sys.exc_info()[0])
 

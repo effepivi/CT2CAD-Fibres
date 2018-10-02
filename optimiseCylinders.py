@@ -68,12 +68,12 @@ energy_spectrum_in_keV = [(33, 1.0)];
 angular_step = angular_span_in_degrees / number_of_projections;
 
 fiber_radius = 140 / 2; # um
-fiber_material = [("Si", 0.5), ("C", 0.5)];
+fiber_material = "SiC";
 fiber_mu = 2.736; # cm-1
 fiber_density = 3.2; # g/cm3
 
 core_radius = 30 / 2; # um
-core_material = [("W", 1)];
+core_material = "W";
 core_mu = 341.61; # cm-1
 core_density = 19.3 # g/cm3
 
@@ -82,7 +82,7 @@ g_matrix_width = 0;
 g_matrix_height = 0;
 g_matrix_x = 0;
 g_matrix_y = 0;
-matrix_material = [("Ti", 0.9), ("Al", 0.06), ("V", 0.04)];
+matrix_material = "Ti90Al6V4";
 matrix_mu = 13.1274; # cm-1
 matrix_density = 4.42 # g/cm3
 
@@ -421,26 +421,14 @@ def setCylinders(aPopuation, resetAll = True):
     gvxr.addMesh("fiber_geometry", "g_fiber_geometry");
     gvxr.addMesh("core_geometry",  "g_core_geometry");
 
-    #fiber_geometry.saveSTLFile("fiber.stl");
-    #core_geometry.saveSTLFile("core.stl");
-
-    #g_matrix_geometry = matrix_geometry - fiber_geometry;
     gvxr.subtractMesh("fiber_geometry", "core_geometry")
 
-    # Matrix
-    #temp1.setMaterial(matrix_material);
-    #temp1.setDensity(matrix_density, "g.cm-3");
-    #g_matrix_geometry.setLinearAttenuationCoefficient(matrix_mu, "cm-1");
-
     # Fiber
-    #temp2.setMaterial(fiber_material);
-    #temp2.setDensity(fiber_density, "g.cm-3");
-    gvxr.setLinearAttenuationCoefficient("fiber_geometry", fiber_mu, "cm-1");
+    gvxr.setCompound("fiber_geometry", fiber_material);
+    gvxr.setDensity("fiber_geometry", fiber_density, "g.cm-3");
 
     # Core
-    #core_geometry.setMaterial(core_material);
-    #core_geometry.setDensity(core_density, "g.cm-3");
-    gvxr.setLinearAttenuationCoefficient("core_geometry", core_mu, "cm-1");
+    gvxr.setElement("core_geometry", core_material);
 
     gvxr.removePolygonMeshesFromXRayRenderer();
     gvxr.addPolygonMeshAsOuterSurface("Matrix");
@@ -755,7 +743,8 @@ def setMatrix(apGeneSet):
     gvxr.scaleNode("Matrix", w, 815, h, "mm");
     gvxr.translateNode("Matrix", y, 0, x, "micrometer");
     
-    gvxr.setLinearAttenuationCoefficient("Matrix", matrix_mu, "cm-1");
+    gvxr.setMixture("Matrix", matrix_material);
+    gvxr.setDensity("Matrix", matrix_density, "g.cm-3");
 
 
    
@@ -763,8 +752,7 @@ def setMatrix(apGeneSet):
 # Run the script
 ################################################################################
 
-#try:
-if True:
+try:
 
     # Initialise the X-ray system and optimisation algorithm
     ani = SubplotAnimation()
@@ -930,4 +918,10 @@ if True:
     gvxr.renderLoop();
    
     exit(); 
+except OSError as err:
+    print("OS error: {0}".format(err))
+except ValueError:
+    print("Could not convert data.")
+except:
+    print("Unexpected error:", sys.exc_info()[0])
 
