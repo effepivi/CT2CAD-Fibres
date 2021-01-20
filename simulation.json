@@ -1,0 +1,60 @@
+{
+  "WindowSize": [512, 512],
+
+  "Detector": {
+    "Position": [-0.08, 0.0, 0.0, "m"],
+    "UpVector": [0, 1, 0],
+    "NumberOfPixels": [1024, 100],
+    "Spacing": [1.9, 1.9, "um"]
+  },
+
+  "Source": {
+    "Position": [144.92,  0.0, 0.0, "m"],
+    "Shape": "PointSource",
+    "Beam": [
+      {
+        "Energy": 33,
+        "Unit": "keV",
+        "PhotonCount": 96
+      },
+
+      {
+        "Energy": 66,
+        "Unit": "keV",
+        "PhotonCount": 3
+      },
+
+      {
+        "Energy": 99,
+        "Unit": "keV",
+        "PhotonCount": 1
+      }
+    ]
+  },
+
+
+  "Samples": [
+    {
+      "Label": "cores",
+      "Path": "Tutorial2/outputs/core.stl",
+      "Unit": "mm",
+      "Material": ["Element", "W"]
+    },
+
+    {
+      "Label": "fibres",
+      "Path": "Tutorial2/outputs/fibre.stl",
+      "Unit": "mm",
+      "Material": ["Compound", "SiC"],
+      "Density": 3.2
+    },
+
+    {
+      "Label": "matrix",
+      "Path": "Tutorial2/outputs/matrix.stl",
+      "Unit": "mm",
+      "Material": ["Mixture", "Ti90Al6V4"],
+      "Density": 4.42
+    }
+  ]
+}
