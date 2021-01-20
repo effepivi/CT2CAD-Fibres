@@ -1343,3 +1343,7 @@ setFibres(centroid_set);
 gvxr.saveSTLfile("fibre", "Tutorial2/outputs/fibre.stl");
 gvxr.saveSTLfile("core",  "Tutorial2/outputs/core.stl");
 ```
+
+The 3D view of the registration looks like:
+
+![3D view](3d-view.png)
