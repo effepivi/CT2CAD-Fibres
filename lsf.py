@@ -27,7 +27,7 @@ def lsf(x):
             temp_3 = math.pow(2.0/f2+math.pi/c2, -1);
             value[i] = (temp_1 + temp_2) * temp_3;     
         
-    print(value)
+    #print(value)
     
     return value
 
