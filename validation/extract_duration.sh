@@ -17,7 +17,7 @@ newdate=`echo $YEAR-01-${DAY}T$HOUR:$MIN:$SEC`
 
 FILES=`ls $i*`
 
-echo "i,RECONSTRUCTION_RUNTIME (in min),CUBE_RUNTIME (in min),MATRIX_ZNCC,X (in um),Y (in um),ROT (in degree),W,H,FIBRES_RUNTIME (in min),FIBRE_ZNCC,RADIUS_CORE (in um),RADIUS_FIBRE (in um),RADIUS_CORE (in pixels),RADIUS_FIBRE (in pixels),AVG,STDDEV,MIN,MAX"
+echo "i,RECONSTRUCTION_RUNTIME (in min),CUBE_RUNTIME (in min),MATRIX_ZNCC,X (in um),Y (in um),ROT (in degree),W (in um),H (in um),MATRIX_ITER,MATRIX_FEVAL,MATRIX_IND,FIBRES_RUNTIME (in min),FIBRE_ZNCC,RADIUS_CORE (in um),RADIUS_FIBRE (in um),RADIUS_CORE (in pixels),RADIUS_FIBRE (in pixels),FIBRE_ITER,FIBRE_FEVAL,FIBRE_IND,AVG,STDDEV,MIN,MAX"
 
 for i in {1..40}
 do
@@ -66,6 +66,13 @@ do
         W=`echo " ($W + 0.5) * 1024 * 1.9" | bc -l`
         H=`echo " ($H + 0.5) * $W" | bc -l`
         
+        TEMP=`grep -n "CUBE " run_SCW_$i/register-$i-*.out | cut -d ":" -f 1`
+        TEMP=`echo $TEMP - 1 | bc`
+        TEMP=`tail -n+$TEMP run_SCW_$i/register-$i-*.out | head -n1 | tr -s ' '`
+        MATRIX_ITER=`echo $TEMP | cut -d " " -f 1`
+        MATRIX_FEVAL=`echo $TEMP | cut -d " " -f 2`
+        MATRIX_IND=`echo $MATRIX_FEVAL / $MATRIX_ITER | bc`
+        
         
         RADIUS_CORE=`grep "Radii: " run_SCW_$i/register-$i-*.out | cut -d " " -f 2`
         RADIUS_FIBRE=`grep "Radii: " run_SCW_$i/register-$i-*.out | cut -d " " -f 3`
@@ -73,13 +80,21 @@ do
         
         RADIUS_CORE_PX=`echo "$RADIUS_CORE/1.9" | bc -l`
         RADIUS_FIBRE_PX=`echo "$RADIUS_FIBRE/1.9" | bc -l`
+
+        TEMP=`grep -n "FIBRES " run_SCW_$i/register-$i-*.out | cut -d ":" -f 1`
+        TEMP=`echo $TEMP - 1 | bc`
+        TEMP=`tail -n+$TEMP run_SCW_$i/register-$i-*.out | head -n1 | tr -s ' '`
+        FIBRE_ITER=`echo $TEMP | cut -d " " -f 1`
+        FIBRE_FEVAL=`echo $TEMP | cut -d " " -f 2`
+        FIBRE_IND=`echo $MATRIX_FEVAL / $MATRIX_ITER | bc`
+
         
         MATRIX_ZNCC=`grep "Matrix CT ZNCC: " run_SCW_$i/register-$i-*.out | cut -d " " -f 4`
         FIBRE_ZNCC=`grep "Fibres CT ZNCC: " run_SCW_$i/register-$i-*.out | cut -d " " -f 4`
         
         STATS=`python3 imageStats.py $CT_slice_file`
 
-        echo $i,$RECONSTRUCTION_RUNTIME,$CUBE_RUNTIME,$MATRIX_ZNCC,$X,$Y,$ROT,$W,$H,$FIBRES_RUNTIME,$FIBRE_ZNCC,$RADIUS_CORE,$RADIUS_FIBRE,$RADIUS_CORE_PX,$FIBRE_ZNCC,$STATS        
+        echo $i,$RECONSTRUCTION_RUNTIME,$CUBE_RUNTIME,$MATRIX_ZNCC,$X,$Y,$ROT,$W,$H,$MATRIX_ITER,$MATRIX_FEVAL,$MATRIX_IND,$FIBRES_RUNTIME,$FIBRE_ZNCC,$RADIUS_CORE,$RADIUS_FIBRE,$RADIUS_CORE_PX,$RADIUS_FIBRE_PX,$FIBRE_ITER,$FIBRE_FEVAL,$FIBRE_IND,$STATS        
     fi    
 done
 
