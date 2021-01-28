@@ -4,3 +4,7 @@ _gvxrPython3.so
 gvxrPython3.py
 outcmaes/
 outputs/
+
+validation/run_SCW_*/
+validation/runtime_*
+
