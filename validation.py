@@ -43,6 +43,7 @@ matplotlib.use('AGG')   # generate postscript output by default
 
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
+from matplotlib import cm
 
 from skimage.transform import iradon
 from skimage.util import compare_images
@@ -716,6 +717,7 @@ print("Fibres CT ZNCC:", ZNCC_CT);
 comp_equalized = compare_images(normalised_reference_CT, normalised_reconstruction_CT_fibres, method='checkerboard');
 
 fig=plt.figure();
+norm = cm.colors.Normalize(vmax=1.25, vmin=-0.5)
 imgplot = plt.imshow(comp_equalized, cmap='gray', norm=norm);
 plt.savefig(output_directory + "/comparison.pdf");
 plt.savefig(output_directory + "/comparison.png");
