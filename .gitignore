@@ -10,3 +10,4 @@ validation/runtime_*
 
 Tutorial2/sino.*
 *.*~
+.~lock.*.csv#
