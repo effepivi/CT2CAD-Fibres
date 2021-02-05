@@ -11,3 +11,9 @@ validation/runtime_*
 Tutorial2/sino.*
 *.*~
 .~lock.*.csv#
+registration-matrix-then-fibres-PC/run_home_*/
+registration-matrix-then-fibres-PC/*~
+
+registration-matrix-then-fibres-SCW/run_SCW_*/
+registration-matrix-then-fibres-SCW/*~
+registration-matrix-then-fibres-SCW/runtime_*
