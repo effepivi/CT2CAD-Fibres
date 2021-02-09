@@ -384,7 +384,7 @@ def simulateSinogram():
 
 
 def fitnessFunction(x):
-    global best_fitness, matrix_id;
+    global best_fitness, matrix_id, g_reference_sinogram;
     setMatrix(x);
 
     # Simulate a sinogram
@@ -393,7 +393,8 @@ def fitnessFunction(x):
 
 
     # Compute the fitness function
-    MAE = np.mean(np.abs(np.subtract(normalised_simulated_sinogram.flatten(), normalised_reference_sinogram.flatten())));
+    #MAE = np.mean(np.abs(np.subtract(normalised_simulated_sinogram.flatten(), normalised_reference_sinogram.flatten())));
+    MAE = np.mean(np.abs(np.subtract(g_reference_sinogram.flatten(), simulated_sinogram.flatten())));
 #     ZNCC = np.mean(np.multiply(normalised_simulated_sinogram.flatten(), normalised_reference_sinogram.flatten()));
 
     return MAE;
@@ -624,8 +625,9 @@ def fitnessFunction(x):
     # Simulate a sinogram
     simulated_sinogram, normalised_projections, raw_projections_in_keV = simulateSinogram();
     normalised_simulated_sinogram = (simulated_sinogram - simulated_sinogram.mean()) / simulated_sinogram.std();
-    MAE = np.mean(np.abs(normalised_simulated_sinogram.flatten() - normalised_reference_sinogram.flatten()));
-    ZNCC = np.mean(np.multiply(normalised_simulated_sinogram.flatten(), normalised_reference_sinogram.flatten()));
+    # MAE = np.mean(np.abs(normalised_simulated_sinogram.flatten() - normalised_reference_sinogram.flatten()));
+    MAE = np.mean(np.abs(np.subtract(g_reference_sinogram.flatten(), simulated_sinogram.flatten())));
+    # ZNCC = np.mean(np.multiply(normalised_simulated_sinogram.flatten(), normalised_reference_sinogram.flatten()));
 
     # Reconstruct the corresponding CT slice
 #     theta = g_theta / 180.0 * math.pi;
@@ -641,8 +643,8 @@ def fitnessFunction(x):
 
     # Save the data
     fitness = MAE;
-    if best_fitness > fitness:
-        best_fitness = fitness;
+    # if best_fitness > fitness:
+    #     best_fitness = fitness;
 
 
 
