@@ -86,7 +86,7 @@ do
         TEMP=`tail -n+$TEMP run_SCW_$i/register-$i-*.out | head -n1 | tr -s ' '`
         FIBRE_ITER=`echo $TEMP | cut -d " " -f 1`
         FIBRE_FEVAL=`echo $TEMP | cut -d " " -f 2`
-        FIBRE_IND=`echo $MATRIX_FEVAL / $MATRIX_ITER | bc`
+        FIBRE_IND=`echo $FIBRE_FEVAL / $FIBRE_ITER | bc`
 
         
         MATRIX_ZNCC=`grep "Matrix CT ZNCC: " run_SCW_$i/register-$i-*.out | cut -d " " -f 4`

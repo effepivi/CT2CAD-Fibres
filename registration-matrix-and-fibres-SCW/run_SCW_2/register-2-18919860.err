@@ -1,0 +1,1 @@
+/var/log/slurm/spool_slurmd/job18919860/slurm_script: line 31: 238210 Segmentation fault      python3 validation-whole_CT.py --input Tutorial2/sino.raw --output validation/run_SCW_2/

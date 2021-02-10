@@ -1,3 +1,6 @@
+register-*-*.out
+register-*-*.err
+
 .ipynb_checkpoints/
 __pycache__/
 _gvxrPython3.so
@@ -17,3 +20,13 @@ registration-matrix-then-fibres-PC/*~
 registration-matrix-then-fibres-SCW/run_SCW_*/
 registration-matrix-then-fibres-SCW/*~
 registration-matrix-then-fibres-SCW/runtime_*
+
+registration-matrix-and-fibres-SCW/run_SCW_*/
+registration-matrix-and-fibres-SCW/*~
+registration-matrix-and-fibres-SCW/runtime_*
+
+registration-matrix-then-fibres2-SCW/run_SCW_*/
+registration-matrix-then-fibres2-SCW/*~
+registration-matrix-then-fibres2-SCW/runtime_*
+
+validation-high-tol/
