@@ -1,0 +1,1 @@
+/var/log/slurm/spool_slurmd/job19034223/slurm_script: line 31: 242129 Segmentation fault      python3 registration-matrix-then-fibres.py --input Tutorial2/sino.raw --output registration-matrix-then-fibres2-SCW/run_SCW_26/
