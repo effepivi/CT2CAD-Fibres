@@ -47,6 +47,7 @@ from matplotlib import cm
 
 from skimage.transform import iradon
 from skimage.util import compare_images
+import skimage.io as io
 
 # import tomopy
 
@@ -383,9 +384,14 @@ def simulateSinogram():
 # In[ ]:
 
 
-def fitnessFunction(x):
-    global best_fitness, matrix_id, g_reference_sinogram;
+use_fibres = False;
+def fitnessFunctionCube(x):
+    global best_fitness, matrix_id, g_reference_sinogram, centroid_set;
     setMatrix(x);
+
+    # Load the cores and fibres
+    if use_fibres:
+        setFibres(centroid_set);
 
     # Simulate a sinogram
     simulated_sinogram, normalised_projections, raw_projections_in_keV = simulateSinogram();
@@ -401,25 +407,42 @@ def fitnessFunction(x):
 
 
 # In[29]:
-start_time = time.time()
+# The registration has already been performed. Load the results.
+if os.path.isfile(output_directory + "/cube1.dat"):
+    current_best = np.loadtxt(output_directory + "/cube1.dat");
+# Perform the registration using CMA-ES
+else:
+    start_time = time.time()
 
-best_fitness = sys.float_info.max;
-matrix_id = 0;
+    best_fitness = sys.float_info.max;
+    matrix_id = 0;
 
-opts = cma.CMAOptions()
-opts.set('tolfun', 1e-3);
-opts['tolx'] = 1e-3;
-opts['bounds'] = [5*[-0.5], 5*[0.5]];
-#opts['seed'] = 123456789;
-# opts['maxiter'] = 5;
+    opts = cma.CMAOptions()
+    opts.set('tolfun', 1e-3);
+    opts['tolx'] = 1e-3;
+    opts['bounds'] = [5*[-0.5], 5*[0.5]];
+    #opts['seed'] = 123456789;
+    # opts['maxiter'] = 5;
 
-es = cma.CMAEvolutionStrategy(5 * [0], 0.5, opts);
-es.optimize(fitnessFunction);
+    es = cma.CMAEvolutionStrategy(5 * [0], 0.5, opts);
+    es.optimize(fitnessFunctionCube);
 
-current_best = copy.deepcopy(es.result.xbest); # [-0.12174177  0.07941929 -0.3949529  -0.18708068 -0.23998638]
-np.savetxt(output_directory + "/cube.dat", current_best, header='x,y,rotation_angle,w,h');
-elapsed_time = time.time() - start_time
-print("CUBE", elapsed_time);
+    current_best = copy.deepcopy(es.result.xbest); # [-0.12174177  0.07941929 -0.3949529  -0.18708068 -0.23998638]
+    np.savetxt(output_directory + "/cube1.dat", current_best, header='x,y,rotation_angle,w,h');
+    elapsed_time = time.time() - start_time
+    print("CUBE1", elapsed_time);
+
+
+
+
+
+
+
+
+
+
+
+
 
 # ### Apply the result of the registration
 
@@ -437,7 +460,27 @@ reconstruction_CT_matrix = iradon(simulated_sinogram.T, theta=g_theta, circle=Tr
 
 volume = sitk.GetImageFromArray(reconstruction_CT_matrix);
 volume.SetSpacing([g_pixel_spacing_in_mm, g_pixel_spacing_in_mm, g_pixel_spacing_in_mm]);
-sitk.WriteImage(volume, output_directory + "/reconstruction_CT_matrix.mha", useCompression=True);
+sitk.WriteImage(volume, output_directory + "/reconstruction_CT_matrix1.mha", useCompression=True);
+
+
+print("Matrix1 params:", current_best);
+normalised_reconstruction_CT_matrix = (reconstruction_CT_matrix - reconstruction_CT_matrix.mean()) / reconstruction_CT_matrix.std();
+ZNCC_CT = np.mean(np.multiply(normalised_reconstruction_CT_matrix.flatten(), normalised_reference_CT.flatten()));
+print("Matrix1 CT ZNCC:", ZNCC_CT);
+
+
+comp_equalized = compare_images(normalised_reference_CT, normalised_reconstruction_CT_fibres, method='checkerboard');
+volume = sitk.GetImageFromArray(comp_equalized);
+volume.SetSpacing([g_pixel_spacing_in_mm, g_pixel_spacing_in_mm, g_pixel_spacing_in_mm]);
+sitk.WriteImage(volume, output_directory + "/compare_reconstruction_CT_matrix1.mha", useCompression=True);
+
+comp_equalized -= np.min(comp_equalized);
+comp_equalized /= np.max(comp_equalized);
+comp_equalized *= 255;
+comp_equalized = np.array(comp_equalized, dtype=np.uint8);
+io.imsave(output_directory + "/compare_reconstruction_CT_matrix1.png", comp_equalized) 
+
+
 
 
 # ## Find circles
@@ -606,7 +649,7 @@ def setFibres(aCentroidSet):
 # In[56]:
 
 
-def fitnessFunction(x):
+def fitnessFunctionFibres(x):
     global best_fitness;
     global radius_fibre_id;
     global fibre_radius;
@@ -658,31 +701,39 @@ def fitnessFunction(x):
     # - the radius of the SiC fibre
     # - the ratio    radius of the W core / radius of the SiC fibre
 
-fibre_radius = 140 / 2; # um
-core_radius = 30 / 2; # um
-ratio = core_radius / fibre_radius;
 
-x0 = [fibre_radius, ratio];
-bounds = [[5, 0.01], [1.5 * fibre_radius, 0.95]];
+# The registration has already been performed. Load the results.
+if os.path.isfile(output_directory + "/fibre_radius1.dat"):
+    temp = np.loadtxt(output_directory + "/fibre_radius1.dat");
+    core_radius = temp[0];
+    fibre_radius = temp[1];
+# Perform the registration using CMA-ES
+else:
+    fibre_radius = 140 / 2; # um
+    core_radius = 30 / 2; # um
+    ratio = core_radius / fibre_radius;
 
-best_fitness = sys.float_info.max;
-radius_fibre_id = 0;
+    x0 = [fibre_radius, ratio];
+    bounds = [[5, 0.01], [1.5 * fibre_radius, 0.95]];
 
-opts = cma.CMAOptions()
-opts.set('tolfun', 1e-3);
-opts['tolx'] = 1e-3;
-opts['bounds'] = bounds;
-#opts['seed'] = 987654321;
-# opts['maxiter'] = 5;
+    best_fitness = sys.float_info.max;
+    radius_fibre_id = 0;
 
-es = cma.CMAEvolutionStrategy(x0, 0.9, opts);
-es.optimize(fitnessFunction);
-elapsed_time = time.time() - start_time
-print("FIBRES",elapsed_time);
-fibre_radius = es.result.xbest[0];
-core_radius = fibre_radius * es.result.xbest[1];
+    opts = cma.CMAOptions()
+    opts.set('tolfun', 1e-3);
+    opts['tolx'] = 1e-3;
+    opts['bounds'] = bounds;
+    #opts['seed'] = 987654321;
+    # opts['maxiter'] = 5;
 
-np.savetxt(output_directory + "/fibre_radius.dat", [core_radius, fibre_radius], header='core_radius_in_um,fibre_radius_in_um');
+    es = cma.CMAEvolutionStrategy(x0, 0.9, opts);
+    es.optimize(fitnessFunctionFibres);
+    elapsed_time = time.time() - start_time
+    print("FIBRES1",elapsed_time);
+    fibre_radius = es.result.xbest[0];
+    core_radius = fibre_radius * es.result.xbest[1];
+
+    np.savetxt(output_directory + "/fibre_radius1.dat", [core_radius, fibre_radius], header='core_radius_in_um,fibre_radius_in_um');
 
 
 
@@ -695,6 +746,7 @@ setFibres(centroid_set);
 
 
 
+
 simulated_sinogram, normalised_projections, raw_projections_in_keV = simulateSinogram();
 
 simulated_sinogram.shape = (simulated_sinogram.size // simulated_sinogram.shape[2], simulated_sinogram.shape[2]);
@@ -702,24 +754,174 @@ reconstruction_CT_fibres = iradon(simulated_sinogram.T, theta=g_theta, circle=Tr
 
 volume = sitk.GetImageFromArray(reconstruction_CT_fibres);
 volume.SetSpacing([g_pixel_spacing_in_mm, g_pixel_spacing_in_mm, g_pixel_spacing_in_mm]);
-sitk.WriteImage(volume, output_directory + "/reconstruction_CT_fibres.mha", useCompression=True);
+sitk.WriteImage(volume, output_directory + "/reconstruction_CT_fibres1.mha", useCompression=True);
 
 
-print("Matrix params:", current_best);
-normalised_reconstruction_CT_matrix = (reconstruction_CT_matrix - reconstruction_CT_matrix.mean()) / reconstruction_CT_matrix.std();
-ZNCC_CT = np.mean(np.multiply(normalised_reconstruction_CT_matrix.flatten(), normalised_reference_CT.flatten()));
-print("Matrix CT ZNCC:", ZNCC_CT);
 
-print("Radii:", core_radius, fibre_radius);
+print("Radii1:", core_radius, fibre_radius);
 normalised_reconstruction_CT_fibres = (reconstruction_CT_fibres - reconstruction_CT_fibres.mean()) / reconstruction_CT_fibres.std();
 ZNCC_CT = np.mean(np.multiply(normalised_reconstruction_CT_fibres.flatten(), normalised_reference_CT.flatten()));
-print("Fibres CT ZNCC:", ZNCC_CT);
-
+print("Fibres1 CT ZNCC:", ZNCC_CT);
 
 comp_equalized = compare_images(normalised_reference_CT, normalised_reconstruction_CT_fibres, method='checkerboard');
+volume = sitk.GetImageFromArray(comp_equalized);
+volume.SetSpacing([g_pixel_spacing_in_mm, g_pixel_spacing_in_mm, g_pixel_spacing_in_mm]);
+sitk.WriteImage(volume, output_directory + "/compare_reconstruction_CT_fibres1.mha", useCompression=True);
 
-fig=plt.figure();
-norm = cm.colors.Normalize(vmax=1.25, vmin=-0.5)
-imgplot = plt.imshow(comp_equalized, cmap='gray', norm=norm);
-plt.savefig(output_directory + "/comparison.pdf");
-plt.savefig(output_directory + "/comparison.png");
+comp_equalized -= np.min(comp_equalized);
+comp_equalized /= np.max(comp_equalized);
+comp_equalized *= 255;
+comp_equalized = np.array(comp_equalized, dtype=np.uint8);
+io.imsave(output_directory + "/compare_reconstruction_CT_fibres1.png", comp_equalized) 
+
+
+
+
+
+
+
+
+use_fibres = True;
+# The registration has already been performed. Load the results.
+if os.path.isfile(output_directory + "/cube2.dat"):
+    current_best = np.loadtxt(output_directory + "/cube2.dat");
+# Perform the registration using CMA-ES
+else:
+    start_time = time.time()
+
+    best_fitness = sys.float_info.max;
+    matrix_id = 0;
+
+    opts = cma.CMAOptions()
+    opts.set('tolfun', 1e-3);
+    opts['tolx'] = 1e-3;
+    opts['bounds'] = [5*[-0.5], 5*[0.5]];
+    #opts['seed'] = 123456789;
+    # opts['maxiter'] = 5;
+
+    es = cma.CMAEvolutionStrategy(current_best, 0.5, opts);
+    es.optimize(fitnessFunctionCube);
+
+    current_best = copy.deepcopy(es.result.xbest); # [-0.12174177  0.07941929 -0.3949529  -0.18708068 -0.23998638]
+    np.savetxt(output_directory + "/cube2.dat", current_best, header='x,y,rotation_angle,w,h');
+    elapsed_time = time.time() - start_time
+    print("CUBE2", elapsed_time);
+
+
+
+
+
+# Load the matrix
+setMatrix(current_best);
+
+# Load the cores and fibres
+setFibres(centroid_set);
+
+
+simulated_sinogram, normalised_projections, raw_projections_in_keV = simulateSinogram();
+
+simulated_sinogram.shape = (simulated_sinogram.size // simulated_sinogram.shape[2], simulated_sinogram.shape[2]);
+reconstruction_CT_matrix = iradon(simulated_sinogram.T, theta=g_theta, circle=True);
+
+volume = sitk.GetImageFromArray(reconstruction_CT_matrix);
+volume.SetSpacing([g_pixel_spacing_in_mm, g_pixel_spacing_in_mm, g_pixel_spacing_in_mm]);
+sitk.WriteImage(volume, output_directory + "/reconstruction_CT_matrix2.mha", useCompression=True);
+
+
+print("Matrix2 params:", current_best);
+normalised_reconstruction_CT_matrix = (reconstruction_CT_matrix - reconstruction_CT_matrix.mean()) / reconstruction_CT_matrix.std();
+ZNCC_CT = np.mean(np.multiply(normalised_reconstruction_CT_matrix.flatten(), normalised_reference_CT.flatten()));
+print("Matrix2 CT ZNCC:", ZNCC_CT);
+
+comp_equalized = compare_images(normalised_reference_CT, normalised_reconstruction_CT_fibres, method='checkerboard');
+volume = sitk.GetImageFromArray(comp_equalized);
+volume.SetSpacing([g_pixel_spacing_in_mm, g_pixel_spacing_in_mm, g_pixel_spacing_in_mm]);
+sitk.WriteImage(volume, output_directory + "/compare_reconstruction_CT_matrix2.mha", useCompression=True);
+
+comp_equalized -= np.min(comp_equalized);
+comp_equalized /= np.max(comp_equalized);
+comp_equalized *= 255;
+comp_equalized = np.array(comp_equalized, dtype=np.uint8);
+io.imsave(output_directory + "/compare_reconstruction_CT_matrix2.png", comp_equalized) 
+
+
+
+
+
+
+
+
+
+
+
+# The registration has already been performed. Load the results.
+if os.path.isfile(output_directory + "/fibre_radius2.dat"):
+    temp = np.loadtxt(output_directory + "/fibre_radius2.dat");
+    core_radius = temp[0];
+    fibre_radius = temp[1];
+# Perform the registration using CMA-ES
+else:
+    ratio = core_radius / fibre_radius;
+
+    x0 = [fibre_radius, ratio];
+    bounds = [[5, 0.01], [1.5 * fibre_radius, 0.95]];
+
+    best_fitness = sys.float_info.max;
+    radius_fibre_id = 0;
+
+    opts = cma.CMAOptions()
+    opts.set('tolfun', 1e-3);
+    opts['tolx'] = 1e-3;
+    opts['bounds'] = bounds;
+    #opts['seed'] = 987654321;
+    # opts['maxiter'] = 5;
+
+    es = cma.CMAEvolutionStrategy(x0, 0.9, opts);
+    es.optimize(fitnessFunctionFibres);
+    elapsed_time = time.time() - start_time
+    print("FIBRES2",elapsed_time);
+    fibre_radius = es.result.xbest[0];
+    core_radius = fibre_radius * es.result.xbest[1];
+
+    np.savetxt(output_directory + "/fibre_radius2.dat", [core_radius, fibre_radius], header='core_radius_in_um,fibre_radius_in_um');
+
+
+
+# Load the matrix
+setMatrix(current_best);
+
+# Load the cores and fibres
+setFibres(centroid_set);
+
+
+
+
+
+simulated_sinogram, normalised_projections, raw_projections_in_keV = simulateSinogram();
+
+simulated_sinogram.shape = (simulated_sinogram.size // simulated_sinogram.shape[2], simulated_sinogram.shape[2]);
+reconstruction_CT_fibres = iradon(simulated_sinogram.T, theta=g_theta, circle=True);
+
+volume = sitk.GetImageFromArray(reconstruction_CT_fibres);
+volume.SetSpacing([g_pixel_spacing_in_mm, g_pixel_spacing_in_mm, g_pixel_spacing_in_mm]);
+sitk.WriteImage(volume, output_directory + "/reconstruction_CT_fibres2.mha", useCompression=True);
+
+
+
+print("Radii2:", core_radius, fibre_radius);
+normalised_reconstruction_CT_fibres = (reconstruction_CT_fibres - reconstruction_CT_fibres.mean()) / reconstruction_CT_fibres.std();
+ZNCC_CT = np.mean(np.multiply(normalised_reconstruction_CT_fibres.flatten(), normalised_reference_CT.flatten()));
+print("Fibres2 CT ZNCC:", ZNCC_CT);
+
+comp_equalized = compare_images(normalised_reference_CT, normalised_reconstruction_CT_fibres, method='checkerboard');
+volume = sitk.GetImageFromArray(comp_equalized);
+volume.SetSpacing([g_pixel_spacing_in_mm, g_pixel_spacing_in_mm, g_pixel_spacing_in_mm]);
+sitk.WriteImage(volume, output_directory + "/compare_reconstruction_CT_fibres2.mha", useCompression=True);
+
+comp_equalized -= np.min(comp_equalized);
+comp_equalized /= np.max(comp_equalized);
+comp_equalized *= 255;
+comp_equalized = np.array(comp_equalized, dtype=np.uint8);
+io.imsave(output_directory + "/compare_reconstruction_CT_fibres2.png", comp_equalized) 
+
+
