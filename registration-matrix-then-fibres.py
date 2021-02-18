@@ -792,7 +792,7 @@ io.imsave(output_directory + "/compare_reconstruction_CT_fibres1.png", comp_equa
 
 # Exhaustive local search to refine the centre of each cylinder
 roi_length = 40;
-for i, cyl in enumerate(aCentroidSet):
+for i, cyl in enumerate(centroid_set):
 
     centre = [
         centroid_set[i][0] + x,
