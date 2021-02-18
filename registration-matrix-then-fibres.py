@@ -399,8 +399,8 @@ def fitnessFunctionCube(x):
 
 
     # Compute the fitness function
-    #MAE = np.mean(np.abs(np.subtract(normalised_simulated_sinogram.flatten(), normalised_reference_sinogram.flatten())));
-    MAE = np.mean(np.abs(np.subtract(g_reference_sinogram.flatten(), simulated_sinogram.flatten())));
+    MAE = np.mean(np.abs(np.subtract(normalised_simulated_sinogram.flatten(), normalised_reference_sinogram.flatten())));
+    #MAE = np.mean(np.abs(np.subtract(g_reference_sinogram.flatten(), simulated_sinogram.flatten())));
 #     ZNCC = np.mean(np.multiply(normalised_simulated_sinogram.flatten(), normalised_reference_sinogram.flatten()));
 
     return MAE;
@@ -668,8 +668,8 @@ def fitnessFunctionFibres(x):
     # Simulate a sinogram
     simulated_sinogram, normalised_projections, raw_projections_in_keV = simulateSinogram();
     normalised_simulated_sinogram = (simulated_sinogram - simulated_sinogram.mean()) / simulated_sinogram.std();
-    # MAE = np.mean(np.abs(normalised_simulated_sinogram.flatten() - normalised_reference_sinogram.flatten()));
-    MAE = np.mean(np.abs(np.subtract(g_reference_sinogram.flatten(), simulated_sinogram.flatten())));
+    MAE = np.mean(np.abs(normalised_simulated_sinogram.flatten() - normalised_reference_sinogram.flatten()));
+    #MAE = np.mean(np.abs(np.subtract(g_reference_sinogram.flatten(), simulated_sinogram.flatten())));
     # ZNCC = np.mean(np.multiply(normalised_simulated_sinogram.flatten(), normalised_reference_sinogram.flatten()));
 
     # Reconstruct the corresponding CT slice
@@ -781,7 +781,68 @@ io.imsave(output_directory + "/compare_reconstruction_CT_fibres1.png", comp_equa
 
 
 
+use_fibres = True;
+# The registration has already been performed. Load the results.
+if os.path.isfile(output_directory + "/cube2.dat"):
+    current_best = np.loadtxt(output_directory + "/cube2.dat");
+# Perform the registration using CMA-ES
+else:
+    start_time = time.time()
 
+    best_fitness = sys.float_info.max;
+    matrix_id = 0;
+
+    opts = cma.CMAOptions()
+    opts.set('tolfun', 1e-3);
+    opts['tolx'] = 1e-3;
+    opts['bounds'] = [5*[-0.5], 5*[0.5]];
+    #opts['seed'] = 123456789;
+    # opts['maxiter'] = 5;
+
+    es = cma.CMAEvolutionStrategy(current_best, 0.125, opts);
+    es.optimize(fitnessFunctionCube);
+
+    current_best = copy.deepcopy(es.result.xbest); # [-0.12174177  0.07941929 -0.3949529  -0.18708068 -0.23998638]
+    np.savetxt(output_directory + "/cube2.dat", current_best, header='x,y,rotation_angle,w,h');
+    elapsed_time = time.time() - start_time
+    print("CUBE2", elapsed_time);
+
+
+
+
+
+# Load the matrix
+setMatrix(current_best);
+
+# Load the cores and fibres
+setFibres(centroid_set);
+
+
+simulated_sinogram, normalised_projections, raw_projections_in_keV = simulateSinogram();
+
+simulated_sinogram.shape = (simulated_sinogram.size // simulated_sinogram.shape[2], simulated_sinogram.shape[2]);
+reconstruction_CT_matrix = iradon(simulated_sinogram.T, theta=g_theta, circle=True);
+
+volume = sitk.GetImageFromArray(reconstruction_CT_matrix);
+volume.SetSpacing([g_pixel_spacing_in_mm, g_pixel_spacing_in_mm, g_pixel_spacing_in_mm]);
+sitk.WriteImage(volume, output_directory + "/reconstruction_CT_matrix2.mha", useCompression=True);
+
+
+print("Matrix2 params:", current_best);
+normalised_reconstruction_CT_matrix = (reconstruction_CT_matrix - reconstruction_CT_matrix.mean()) / reconstruction_CT_matrix.std();
+ZNCC_CT = np.mean(np.multiply(normalised_reconstruction_CT_matrix.flatten(), normalised_reference_CT.flatten()));
+print("Matrix2 CT ZNCC:", ZNCC_CT);
+
+comp_equalized = compare_images(normalised_reference_CT, normalised_reconstruction_CT_matrix, method='checkerboard');
+volume = sitk.GetImageFromArray(comp_equalized);
+volume.SetSpacing([g_pixel_spacing_in_mm, g_pixel_spacing_in_mm, g_pixel_spacing_in_mm]);
+sitk.WriteImage(volume, output_directory + "/compare_reconstruction_CT_matrix2.mha", useCompression=True);
+
+comp_equalized -= np.min(comp_equalized);
+comp_equalized /= np.max(comp_equalized);
+comp_equalized *= 255;
+comp_equalized = np.array(comp_equalized, dtype=np.uint8);
+io.imsave(output_directory + "/compare_reconstruction_CT_matrix2.png", comp_equalized) 
 
 
 
@@ -887,68 +948,7 @@ io.imsave(output_directory + "/compare_reconstruction_CT_fibres2.png", comp_equa
 
 
 
-use_fibres = True;
-# The registration has already been performed. Load the results.
-if os.path.isfile(output_directory + "/cube2.dat"):
-    current_best = np.loadtxt(output_directory + "/cube2.dat");
-# Perform the registration using CMA-ES
-else:
-    start_time = time.time()
 
-    best_fitness = sys.float_info.max;
-    matrix_id = 0;
-
-    opts = cma.CMAOptions()
-    opts.set('tolfun', 1e-3);
-    opts['tolx'] = 1e-3;
-    opts['bounds'] = [5*[-0.5], 5*[0.5]];
-    #opts['seed'] = 123456789;
-    # opts['maxiter'] = 5;
-
-    es = cma.CMAEvolutionStrategy(current_best, 0.5, opts);
-    es.optimize(fitnessFunctionCube);
-
-    current_best = copy.deepcopy(es.result.xbest); # [-0.12174177  0.07941929 -0.3949529  -0.18708068 -0.23998638]
-    np.savetxt(output_directory + "/cube2.dat", current_best, header='x,y,rotation_angle,w,h');
-    elapsed_time = time.time() - start_time
-    print("CUBE2", elapsed_time);
-
-
-
-
-
-# Load the matrix
-setMatrix(current_best);
-
-# Load the cores and fibres
-setFibres(centroid_set);
-
-
-simulated_sinogram, normalised_projections, raw_projections_in_keV = simulateSinogram();
-
-simulated_sinogram.shape = (simulated_sinogram.size // simulated_sinogram.shape[2], simulated_sinogram.shape[2]);
-reconstruction_CT_matrix = iradon(simulated_sinogram.T, theta=g_theta, circle=True);
-
-volume = sitk.GetImageFromArray(reconstruction_CT_matrix);
-volume.SetSpacing([g_pixel_spacing_in_mm, g_pixel_spacing_in_mm, g_pixel_spacing_in_mm]);
-sitk.WriteImage(volume, output_directory + "/reconstruction_CT_matrix2.mha", useCompression=True);
-
-
-print("Matrix2 params:", current_best);
-normalised_reconstruction_CT_matrix = (reconstruction_CT_matrix - reconstruction_CT_matrix.mean()) / reconstruction_CT_matrix.std();
-ZNCC_CT = np.mean(np.multiply(normalised_reconstruction_CT_matrix.flatten(), normalised_reference_CT.flatten()));
-print("Matrix2 CT ZNCC:", ZNCC_CT);
-
-comp_equalized = compare_images(normalised_reference_CT, normalised_reconstruction_CT_matrix, method='checkerboard');
-volume = sitk.GetImageFromArray(comp_equalized);
-volume.SetSpacing([g_pixel_spacing_in_mm, g_pixel_spacing_in_mm, g_pixel_spacing_in_mm]);
-sitk.WriteImage(volume, output_directory + "/compare_reconstruction_CT_matrix2.mha", useCompression=True);
-
-comp_equalized -= np.min(comp_equalized);
-comp_equalized /= np.max(comp_equalized);
-comp_equalized *= 255;
-comp_equalized = np.array(comp_equalized, dtype=np.uint8);
-io.imsave(output_directory + "/compare_reconstruction_CT_matrix2.png", comp_equalized) 
 
 
 
@@ -982,7 +982,7 @@ else:
     #opts['seed'] = 987654321;
     # opts['maxiter'] = 5;
 
-    es = cma.CMAEvolutionStrategy(x0, 0.9, opts);
+    es = cma.CMAEvolutionStrategy(x0, 0.25, opts);
     es.optimize(fitnessFunctionFibres);
     elapsed_time = time.time() - start_time
     print("FIBRES2",elapsed_time);
