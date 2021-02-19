@@ -47,6 +47,7 @@ from matplotlib import cm
 
 from skimage.transform import iradon
 from skimage.util import compare_images
+from scipy import ndimage
 import skimage.io as io
 
 # import tomopy
@@ -1030,4 +1031,122 @@ comp_equalized *= 255;
 comp_equalized = np.array(comp_equalized, dtype=np.uint8);
 io.imsave(output_directory + "/compare_reconstruction_CT_fibres3.png", comp_equalized) 
 
+
+
+
+
+
+
+roi_length = 40;
+
+def create_circular_mask(h, w, center=None, radius=None):
+
+    if center is None: # use the middle of the image
+        center = (int(w/2), int(h/2))
+    if radius is None: # use the smallest distance between the center and image walls
+        radius = min(center[0], center[1], w-center[0], h-center[1])
+
+    Y, X = np.ogrid[:h, :w]
+    dist_from_center = np.sqrt((X - center[0])**2 + (Y-center[1])**2)
+
+    mask = dist_from_center <= radius
+    return np.array(mask, dtype=bool);
+    
+    
+    
+reference_fibre_in_centre = np.array(copy.deepcopy(g_reference_CT[best_centre[1] - roi_length:best_centre[1] + roi_length, best_centre[0] - roi_length:best_centre[0] + roi_length]));
+
+
+
+
+# Find the cylinder in the centre of the image
+best_centre = None;
+best_distance = sys.float_info.max;
+
+for centre in centroid_set:
+    distance = math.pow(centre[0] - g_reference_CT.shape[1] / 2,2 ) + math.pow(centre[1] - g_reference_CT.shape[0] / 2, 2);
+
+    if best_distance > distance:
+        best_distance = distance;
+        best_centre = copy.deepcopy(centre);
+        
+test_fibre_in_centre = np.array(copy.deepcopy(reconstruction_CT_fibres[best_centre[1] - roi_length:best_centre[1] + roi_length, best_centre[0] - roi_length:best_centre[0] + roi_length]));
+
+
+volume = sitk.GetImageFromArray(test_fibre_in_centre);
+volume.SetSpacing([g_pixel_spacing_in_mm, g_pixel_spacing_in_mm, g_pixel_spacing_in_mm]);
+sitk.WriteImage(volume, output_directory + "/reconstruction_CT_fibre_in_centre.mha", useCompression=True);
+
+
+
+
+mask_shape = reference_fibre_in_centre.shape;
+
+core_mask = create_circular_mask(mask_shape[1], mask_shape[0], None, core_radius_in_px);
+
+fibre_mask = create_circular_mask(mask_shape[1], mask_shape[0], None, fibre_radius_in_px);
+matrix_mask = np.logical_not(fibre_mask);
+
+#fibre_mask = np.subtract(fibre_mask, core_mask);
+fibre_mask = np.bitwise_xor(fibre_mask, core_mask);
+
+#TypeError: numpy boolean subtract, the `-` operator, is not supported, use the bitwise_xor, the `^` operator, or the logical_xor function instead.
+
+
+core_mask = ndimage.binary_erosion(core_mask).astype(core_mask.dtype);
+np.savetxt(output_directory + "/core_mask.txt", core_mask);
+
+fibre_mask = ndimage.binary_erosion(fibre_mask).astype(core_mask.dtype);
+np.savetxt(output_directory + "/fibre_mask.txt", fibre_mask);
+
+matrix_mask = ndimage.binary_erosion(matrix_mask).astype(core_mask.dtype);
+np.savetxt(output_directory + "/matrix_mask.txt", matrix_mask);
+
+
+
+
+index = np.nonzero(core_mask);
+print("CORE REF (MIN, MEDIAN, MAX, MEAN, STDDEV):",
+        np.min(reference_fibre_in_centre[index]),
+        np.median(reference_fibre_in_centre[index]),
+        np.max(reference_fibre_in_centre[index]),
+        np.mean(reference_fibre_in_centre[index]),
+        np.std(reference_fibre_in_centre[index]));
+
+print("CORE SIMULATED (MIN, MEDIAN, MAX, MEAN, STDDEV):",
+        np.min(test_fibre_in_centre[index]),
+        np.median(test_fibre_in_centre[index]),
+        np.max(test_fibre_in_centre[index]),
+        np.mean(test_fibre_in_centre[index]),
+        np.std(test_fibre_in_centre[index]));
+
+index = np.nonzero(fibre_mask);
+print("FIBRE REF (MIN, MEDIAN, MAX, MEAN, STDDEV):",
+        np.min(reference_fibre_in_centre[index]),
+        np.median(reference_fibre_in_centre[index]),
+        np.max(reference_fibre_in_centre[index]),
+        np.mean(reference_fibre_in_centre[index]),
+        np.std(reference_fibre_in_centre[index]));
+
+print("FIBRE SIMULATED (MIN, MEDIAN, MAX, MEAN, STDDEV):",
+        np.min(test_fibre_in_centre[index]),
+        np.median(test_fibre_in_centre[index]),
+        np.max(test_fibre_in_centre[index]),
+        np.mean(test_fibre_in_centre[index]),
+        np.std(test_fibre_in_centre[index]));
+        
+index = np.nonzero(matrix_mask);
+print("MATRIX REF (MIN, MEDIAN, MAX, MEAN, STDDEV):",
+        np.min(reference_fibre_in_centre[index]),
+        np.median(reference_fibre_in_centre[index]),
+        np.max(reference_fibre_in_centre[index]),
+        np.mean(reference_fibre_in_centre[index]),
+        np.std(reference_fibre_in_centre[index]));
+
+print("MATRIX SIMULATED (MIN, MEDIAN, MAX, MEAN, STDDEV):",
+        np.min(test_fibre_in_centre[index]),
+        np.median(test_fibre_in_centre[index]),
+        np.max(test_fibre_in_centre[index]),
+        np.mean(test_fibre_in_centre[index]),
+        np.std(test_fibre_in_centre[index]));
 
