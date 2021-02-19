@@ -470,11 +470,12 @@ ZNCC_CT = np.mean(np.multiply(normalised_reconstruction_CT_matrix.flatten(), nor
 print("Matrix1 CT ZNCC:", ZNCC_CT);
 
 
-comp_equalized = compare_images(normalised_reference_CT, normalised_reconstruction_CT_matrix, method='checkerboard');
+comp_equalized = compare_images(g_reference_CT, reconstruction_CT_matrix, method='checkerboard');
 volume = sitk.GetImageFromArray(comp_equalized);
 volume.SetSpacing([g_pixel_spacing_in_mm, g_pixel_spacing_in_mm, g_pixel_spacing_in_mm]);
 sitk.WriteImage(volume, output_directory + "/compare_reconstruction_CT_matrix1.mha", useCompression=True);
 
+comp_equalized = compare_images(normalised_reference_CT, normalised_reconstruction_CT_matrix, method='checkerboard');
 comp_equalized -= np.min(comp_equalized);
 comp_equalized /= np.max(comp_equalized);
 comp_equalized *= 255;
@@ -764,11 +765,12 @@ normalised_reconstruction_CT_fibres = (reconstruction_CT_fibres - reconstruction
 ZNCC_CT = np.mean(np.multiply(normalised_reconstruction_CT_fibres.flatten(), normalised_reference_CT.flatten()));
 print("Fibres1 CT ZNCC:", ZNCC_CT);
 
-comp_equalized = compare_images(normalised_reference_CT, normalised_reconstruction_CT_fibres, method='checkerboard');
+comp_equalized = compare_images(g_reference_CT, reconstruction_CT_fibres, method='checkerboard');
 volume = sitk.GetImageFromArray(comp_equalized);
 volume.SetSpacing([g_pixel_spacing_in_mm, g_pixel_spacing_in_mm, g_pixel_spacing_in_mm]);
 sitk.WriteImage(volume, output_directory + "/compare_reconstruction_CT_fibres1.mha", useCompression=True);
 
+comp_equalized = compare_images(normalised_reference_CT, normalised_reconstruction_CT_fibres, method='checkerboard');
 comp_equalized -= np.min(comp_equalized);
 comp_equalized /= np.max(comp_equalized);
 comp_equalized *= 255;
@@ -834,11 +836,12 @@ normalised_reconstruction_CT_matrix = (reconstruction_CT_matrix - reconstruction
 ZNCC_CT = np.mean(np.multiply(normalised_reconstruction_CT_matrix.flatten(), normalised_reference_CT.flatten()));
 print("Matrix2 CT ZNCC:", ZNCC_CT);
 
-comp_equalized = compare_images(normalised_reference_CT, normalised_reconstruction_CT_matrix, method='checkerboard');
+comp_equalized = compare_images(g_reference_CT, reconstruction_CT_matrix, method='checkerboard');
 volume = sitk.GetImageFromArray(comp_equalized);
 volume.SetSpacing([g_pixel_spacing_in_mm, g_pixel_spacing_in_mm, g_pixel_spacing_in_mm]);
 sitk.WriteImage(volume, output_directory + "/compare_reconstruction_CT_matrix2.mha", useCompression=True);
 
+comp_equalized = compare_images(normalised_reference_CT, normalised_reconstruction_CT_matrix, method='checkerboard');
 comp_equalized -= np.min(comp_equalized);
 comp_equalized /= np.max(comp_equalized);
 comp_equalized *= 255;
@@ -932,11 +935,12 @@ normalised_reconstruction_CT_fibres = (reconstruction_CT_fibres - reconstruction
 ZNCC_CT = np.mean(np.multiply(normalised_reconstruction_CT_fibres.flatten(), normalised_reference_CT.flatten()));
 print("Fibres2 CT ZNCC:", ZNCC_CT);
 
-comp_equalized = compare_images(normalised_reference_CT, normalised_reconstruction_CT_fibres, method='checkerboard');
+comp_equalized = compare_images(g_reference_CT, reconstruction_CT_fibres, method='checkerboard');
 volume = sitk.GetImageFromArray(comp_equalized);
 volume.SetSpacing([g_pixel_spacing_in_mm, g_pixel_spacing_in_mm, g_pixel_spacing_in_mm]);
 sitk.WriteImage(volume, output_directory + "/compare_reconstruction_CT_fibres2.mha", useCompression=True);
 
+comp_equalized = compare_images(normalised_reference_CT, normalised_reconstruction_CT_fibres, method='checkerboard');
 comp_equalized -= np.min(comp_equalized);
 comp_equalized /= np.max(comp_equalized);
 comp_equalized *= 255;
@@ -1020,11 +1024,12 @@ normalised_reconstruction_CT_fibres = (reconstruction_CT_fibres - reconstruction
 ZNCC_CT = np.mean(np.multiply(normalised_reconstruction_CT_fibres.flatten(), normalised_reference_CT.flatten()));
 print("Fibres3 CT ZNCC:", ZNCC_CT);
 
-comp_equalized = compare_images(normalised_reference_CT, normalised_reconstruction_CT_fibres, method='checkerboard');
+comp_equalized = compare_images(g_reference_CT, reconstruction_CT_fibres, method='checkerboard');
 volume = sitk.GetImageFromArray(comp_equalized);
 volume.SetSpacing([g_pixel_spacing_in_mm, g_pixel_spacing_in_mm, g_pixel_spacing_in_mm]);
 sitk.WriteImage(volume, output_directory + "/compare_reconstruction_CT_fibres3.mha", useCompression=True);
 
+comp_equalized = compare_images(normalised_reference_CT, normalised_reconstruction_CT_fibres, method='checkerboard');
 comp_equalized -= np.min(comp_equalized);
 comp_equalized /= np.max(comp_equalized);
 comp_equalized *= 255;
@@ -1038,6 +1043,8 @@ io.imsave(output_directory + "/compare_reconstruction_CT_fibres3.png", comp_equa
 
 
 roi_length = 40;
+fibre_radius_in_px = fibre_radius / g_pixel_spacing_in_micrometre
+core_radius_in_px = core_radius / g_pixel_spacing_in_micrometre
 
 def create_circular_mask(h, w, center=None, radius=None):
 
@@ -1053,12 +1060,6 @@ def create_circular_mask(h, w, center=None, radius=None):
     return np.array(mask, dtype=bool);
     
     
-    
-reference_fibre_in_centre = np.array(copy.deepcopy(g_reference_CT[best_centre[1] - roi_length:best_centre[1] + roi_length, best_centre[0] - roi_length:best_centre[0] + roi_length]));
-
-
-
-
 # Find the cylinder in the centre of the image
 best_centre = None;
 best_distance = sys.float_info.max;
@@ -1071,6 +1072,12 @@ for centre in centroid_set:
         best_centre = copy.deepcopy(centre);
         
 test_fibre_in_centre = np.array(copy.deepcopy(reconstruction_CT_fibres[best_centre[1] - roi_length:best_centre[1] + roi_length, best_centre[0] - roi_length:best_centre[0] + roi_length]));
+
+reference_fibre_in_centre = np.array(copy.deepcopy(g_reference_CT[best_centre[1] - roi_length:best_centre[1] + roi_length, best_centre[0] - roi_length:best_centre[0] + roi_length]));
+
+
+
+
 
 
 volume = sitk.GetImageFromArray(test_fibre_in_centre);
