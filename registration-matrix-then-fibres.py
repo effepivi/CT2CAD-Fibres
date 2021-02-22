@@ -1080,10 +1080,13 @@ reference_fibre_in_centre = np.array(copy.deepcopy(g_reference_CT[best_centre[1]
 
 
 
+volume = sitk.GetImageFromArray(reference_fibre_in_centre);
+volume.SetSpacing([g_pixel_spacing_in_mm, g_pixel_spacing_in_mm, g_pixel_spacing_in_mm]);
+sitk.WriteImage(volume, output_directory + "/reference_fibre_in_centre.mha", useCompression=True);
+
 volume = sitk.GetImageFromArray(test_fibre_in_centre);
 volume.SetSpacing([g_pixel_spacing_in_mm, g_pixel_spacing_in_mm, g_pixel_spacing_in_mm]);
 sitk.WriteImage(volume, output_directory + "/reconstruction_CT_fibre_in_centre.mha", useCompression=True);
-
 
 
 
