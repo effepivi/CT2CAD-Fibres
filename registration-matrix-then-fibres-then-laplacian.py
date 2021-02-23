@@ -404,11 +404,11 @@ def getLBuffer(object):
     # Return as a numpy array
     return np.array(L_buffer);
 
-def simulateSinogram(sigma = None, k = None):
+def simulateSinogram(sigma_set = None, k_set = None):
 
 
     # Do not simulate the phase contrast using a Laplacian
-    if isinstance(sigma, type(None)) or isinstance(k, type(None)):
+    if isinstance(sigma_set, type(None)) or isinstance(k_set, type(None)):
 
         # Get the raw projections in keV
         raw_projections_in_keV = tomographyAcquisition();
@@ -418,15 +418,16 @@ def simulateSinogram(sigma = None, k = None):
 
         # Create the convolution filter
         pixel_range = np.linspace(-value_range, value_range, num=int(num_samples), endpoint=True)
-        laplace = laplacian(pixel_range, sigma);
+        laplacian_kernels = {};
 
         # Store the L-buffers
         L_buffer_set = {};
 
         # Look at all the children of the root node
-        for label in ["core", "fibre", "matrix"]:
+        for label, sigma in zip(["core", "fibre", "matrix"], sigma_set):
             # Get its L-buffer
             L_buffer_set[label] = getLBuffer(label);
+            laplacian_kernels[label] = laplacian(pixel_range, sigma);
 
         # For each energy in the beam spectrum
         attenuation = {};
@@ -437,15 +438,18 @@ def simulateSinogram(sigma = None, k = None):
         # Create a blank image
         raw_projections_in_keV = np.zeros(L_buffer_set["fibre"].shape);
 
+        phase_contrast_image_min = sys.float_info.max;
+        phase_contrast_image_max = -sys.float_info.max;
+        
         for energy, photon_count in zip(gvxr.getEnergyBins("keV"), gvxr.getPhotonCountEnergyBins()):
 
             # Create a blank image
             attenuation[energy] = np.zeros(L_buffer_set["fibre"].shape);
-
+            phase_contrast_image[energy] = {};
+            
             # Look at all the children of the root node
             #for label in ["core", "fibre", "matrix"]:
-            for label in ["core", "fibre", "matrix"]:
-            #for label in ["fibre"]:
+            for label, sigma, in zip(["core", "fibre", "matrix"], sigma_set):
                 # Get mu for this object for this energy
                 mu = gvxr.getLinearAttenuationCoefficient(label, energy, "keV");
 
@@ -453,41 +457,30 @@ def simulateSinogram(sigma = None, k = None):
                 temp = L_buffer_set[label] * mu;
                 attenuation[energy] += temp;
 
-                if label == "fibre":
-                    attenuation_fibre[energy] = temp;
-                #elif label == "fibre":
-                #    attenuation_fibre[energy] += temp;
+                phase_contrast_image[energy][label] = [];
+                
+                for y in range(attenuation[energy].shape[1]):
+                    for x in range(attenuation[energy].shape[0]):
+                        phase_contrast_image[energy][label].append(np.convolve(temp[x][y], laplacian_kernels[label], mode='same'));
+                                
+                phase_contrast_image[energy][label] = np.array(phase_contrast_image[energy][label]);
+                phase_contrast_image[energy][label].shape = L_buffer_set[label].shape;
+
+                phase_contrast_image_min = min(phase_contrast_image_min, np.min(phase_contrast_image[energy][label]));
+                phase_contrast_image_max = max(phase_contrast_image_min, np.max(phase_contrast_image[energy][label]));
 
             # Store the projection for this energy channel
             projection_per_energy_channel[energy] = energy * photon_count * np.exp(-attenuation[energy]);
 
         # Create the raw projections
         raw_projections_in_keV = np.zeros(L_buffer_set["fibre"].shape);
-
-        phase_contrast_image_min = sys.float_info.max;
-        phase_contrast_image_max = -sys.float_info.max;
-        
-        for energy in gvxr.getEnergyBins("keV"):
-
-            # Perform the convolution on the attenuation
-            shape = [L_buffer_set["fibre"].shape[0], L_buffer_set["fibre"].shape[1], L_buffer_set["fibre"].shape[2]];
-            phase_contrast_image[energy] = [];
-
-            for y in range(attenuation_fibre[energy].shape[1]):
-                for x in range(attenuation_fibre[energy].shape[0]):
-                    phase_contrast_image[energy].append(np.convolve(attenuation_fibre[energy][x][y], laplace, mode='same'));
-                    #phase_contrast_image[energy].append(np.convolve(attenuation[energy][x][y], laplace, mode='same'));
-
-            phase_contrast_image[energy] = np.array(phase_contrast_image[energy]);
-            phase_contrast_image[energy].shape = raw_projections_in_keV.shape;
-
-            phase_contrast_image_min = min(phase_contrast_image_min, np.min(phase_contrast_image[energy]));
-            phase_contrast_image_max = max(phase_contrast_image_min, np.max(phase_contrast_image[energy]));
             
         for energy in gvxr.getEnergyBins("keV"):
-            # Normalise it
-            phase_contrast_image[energy] /= max(phase_contrast_image_max, abs(phase_contrast_image_min));
-            raw_projections_in_keV += projection_per_energy_channel[energy] - k * phase_contrast_image[energy];
+            raw_projections_in_keV += projection_per_energy_channel[energy];
+            for label, k in zip(["core", "fibre", "matrix"], k_set):
+                # Normalise it
+                phase_contrast_image[energy][label] /= max(phase_contrast_image_max, abs(phase_contrast_image_min));
+                raw_projections_in_keV -= k * phase_contrast_image[energy][label];
 
     # Apply the LSF line by line
     for z in range(raw_projections_in_keV.shape[0]):
@@ -1181,14 +1174,18 @@ def fitnessFunctionLaplacian(x):
     global num_samples;
     global best_centre;
 
-    sigma = x[0];
-    k = x[1];
+    sigma_core = x[0];
+    sigma_fibre = x[1];
+    sigma_matrix = x[2];
+    k_core = x[3];
+    k_fibre = x[4];
+    k_matrix = x[5];
     # value_range = x[2];
     # num_samples = x[3];
 
     # Get the radii
     # fibre_radius = x[4];
-    fibre_radius = x[2];
+    fibre_radius = x[6];
 
     # Load the matrix
     setMatrix(current_best);
@@ -1197,10 +1194,11 @@ def fitnessFunctionLaplacian(x):
     setFibres(centroid_set);
 
     # Simulate a sinogram
-    simulated_sinogram, normalised_projections, raw_projections_in_keV = simulateSinogram(sigma, k);
+    simulated_sinogram, normalised_projections, raw_projections_in_keV = simulateSinogram([sigma_core, sigma_fibre, sigma_matrix], [k_core, k_fibre, k_matrix]);
     normalised_simulated_sinogram = (simulated_sinogram - simulated_sinogram.mean()) / simulated_sinogram.std();
     MAE_sinogram = np.mean(np.abs(normalised_simulated_sinogram.flatten() - normalised_reference_sinogram.flatten()));
-
+    ZNCC_sinogram = np.mean(np.multiply(normalised_simulated_sinogram.flatten(), normalised_reference_sinogram.flatten()));
+    
     # Reconstruct the corresponding CT slice
     simulated_sinogram.shape = (simulated_sinogram.size // simulated_sinogram.shape[2], simulated_sinogram.shape[2]);
     CT_laplacian = iradon(simulated_sinogram.T, theta=g_theta, circle=True);
@@ -1210,7 +1208,7 @@ def fitnessFunctionLaplacian(x):
     test_image = copy.deepcopy(CT_laplacian[best_centre[1] - roi_length:best_centre[1] + roi_length, best_centre[0] - roi_length:best_centre[0] + roi_length]);
 
     # MAE_sinogram = np.mean(np.abs(np.subtract(g_reference_sinogram.flatten(), simulated_sinogram.flatten())));
-    # ZNCC_sinogram = np.mean(np.multiply(normalised_simulated_sinogram.flatten(), normalised_reference_sinogram.flatten()));
+
     #
     # normalised_simulated_sinogram.shape = (normalised_simulated_sinogram.size // normalised_simulated_sinogram.shape[2], normalised_simulated_sinogram.shape[2]);
     #
@@ -1259,18 +1257,18 @@ def fitnessFunctionLaplacian(x):
     #
     #
     #
-    # reference_image = (reference_image - reference_image.mean()) / reference_image.std();
-    # test_image = (test_image - test_image.mean()) / test_image.std();
+
 
     MAE_fibre = np.mean(np.abs(np.subtract(reference_image.flatten(), test_image.flatten())));
-    ZNCC_fibre = np.mean(np.multiply(reference_image.flatten(), test_image.flatten()));
+    
+
     # SSIM_fibre = ssim(reference_image, test_image, data_range=reference_image.max() - reference_image.min())
 
     fitness = MAE_sinogram;
     fitness = MAE_fibre;
     #fitness = MAE_CT;
     #fitness = 1 / (ZNCC_CT + 1);
-
+    
     if best_fitness > fitness:
         best_fitness = fitness;
 
@@ -1306,6 +1304,12 @@ def fitnessFunctionLaplacian(x):
 
         laplacian_id += 1;
 
+
+    reference_image = (reference_image - reference_image.mean()) / reference_image.std();
+    test_image = (test_image - test_image.mean()) / test_image.std();    
+    ZNCC_fibre = np.mean(np.multiply(reference_image.flatten(), test_image.flatten()));
+    print("IND", x[0], x[1], x[2], x[3], x[4], x[5], x[6], MAE_sinogram, ZNCC_sinogram, MAE_CT, ZNCC_CT, MAE_fibre, ZNCC_fibre);
+
     return fitness;
 
 # Find the cylinder in the centre of the image
@@ -1325,16 +1329,21 @@ num_samples = 15;
 # The registration has already been performed. Load the results.
 if os.path.isfile(output_directory + "/laplacian.dat"):
     temp = np.loadtxt(output_directory + "/laplacian.dat");
-    sigma = temp[0];
-    k = temp[1];
-    fibre_radius = temp[2];
+    sigma_core = temp[0];
+    sigma_fibre = temp[1];
+    sigma_matrix = temp[2];
+    k_core = temp[3];
+    k_fibre = temp[4];
+    k_matrix = temp[5];
+    fibre_radius = temp[6];
 # Perform the registration using CMA-ES
 else:
-    sigma = 0.3
-    k = 3.5;
 
-    x0 = [sigma,k,fibre_radius];
-    bounds = [[0.00001, 0.0, 0.75 * fibre_radius], [1, 10, 1.25 * fibre_radius]];
+    sigma_core = sigma_fibre = sigma_matrix = 0.3
+    k_core = k_fibre = k_matrix = 2.0;
+
+    x0 = [sigma_core, sigma_fibre, sigma_matrix, k_core, k_fibre, k_matrix, fibre_radius];
+    bounds = [[0.05, 0.05, 0.05, 0.0, 0.0, 0.0, 0.75 * fibre_radius], [1, 1, 1, 5, 5, 5, 1.25 * fibre_radius]];
 
     best_fitness = sys.float_info.max;
     laplacian_id = 0;
@@ -1345,7 +1354,7 @@ else:
     opts['bounds'] = bounds;
     #opts['seed'] = 987654321;
     # opts['maxiter'] = 5;
-    opts['CMA_stds'] = [0.25, 2.0, fibre_radius * 0.025];
+    opts['CMA_stds'] = [0.25, 0.25, 0.25, 2.0, 2.0, 2.0, fibre_radius * 0.025];
 
 
     es = cma.CMAEvolutionStrategy(x0, 0.25, opts);
@@ -1353,11 +1362,15 @@ else:
     elapsed_time = time.time() - start_time
     print("LAPLACIAN",elapsed_time);
 
-    sigma = es.result.xbest[0];
-    k = es.result.xbest[1];
-    fibre_radius = es.result.xbest[2];
+    sigma_core = es.result.xbest[0];
+    sigma_fibre = es.result.xbest[1];
+    sigma_matrix = es.result.xbest[2];
+    k_core = es.result.xbest[3];
+    k_fibre = es.result.xbest[4];
+    k_matrix = es.result.xbest[5];
+    fibre_radius = es.result.xbest[6];
 
-    np.savetxt(output_directory + "/laplacian.dat", [sigma, k, fibre_radius], header='sigma,k,fibre_radius_in_um');
+    np.savetxt(output_directory + "/laplacian.dat", [sigma_core, sigma_fibre, sigma_matrix, k_core, k_fibre, k_matrix, fibre_radius], header='sigma_core,sigma_fibre,sigma_matrix,k_core,k_fibre,k_matrix,fibre_radius_in_um');
 
 
 
