@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # coding: utf-8
 
 # # Registration of Tungsten fibres on XCT images
@@ -432,6 +432,7 @@ def simulateSinogram(sigma = None, k = None):
         attenuation = {};
         attenuation_fibre = {};
         projection_per_energy_channel = {};
+        phase_contrast_image = {};
 
         # Create a blank image
         raw_projections_in_keV = np.zeros(L_buffer_set["fibre"].shape);
@@ -454,8 +455,8 @@ def simulateSinogram(sigma = None, k = None):
 
                 if label == "fibre":
                     attenuation_fibre[energy] = temp;
-                elif label == "matrix":
-                    attenuation_fibre[energy] += temp;
+                #elif label == "fibre":
+                #    attenuation_fibre[energy] += temp;
 
             # Store the projection for this energy channel
             projection_per_energy_channel[energy] = energy * photon_count * np.exp(-attenuation[energy]);
@@ -463,24 +464,30 @@ def simulateSinogram(sigma = None, k = None):
         # Create the raw projections
         raw_projections_in_keV = np.zeros(L_buffer_set["fibre"].shape);
 
+        phase_contrast_image_min = sys.float_info.max;
+        phase_contrast_image_max = -sys.float_info.max;
+        
         for energy in gvxr.getEnergyBins("keV"):
 
             # Perform the convolution on the attenuation
             shape = [L_buffer_set["fibre"].shape[0], L_buffer_set["fibre"].shape[1], L_buffer_set["fibre"].shape[2]];
-            phase_contrast_image = [];
+            phase_contrast_image[energy] = [];
 
             for y in range(attenuation_fibre[energy].shape[1]):
                 for x in range(attenuation_fibre[energy].shape[0]):
-                    # phase_contrast_image.append(np.convolve(attenuation_fibre[energy][x][y], laplace, mode='same'));
-                    phase_contrast_image.append(np.convolve(attenuation[energy][x][y], laplace, mode='same'));
+                    phase_contrast_image[energy].append(np.convolve(attenuation_fibre[energy][x][y], laplace, mode='same'));
+                    #phase_contrast_image[energy].append(np.convolve(attenuation[energy][x][y], laplace, mode='same'));
 
-            phase_contrast_image = np.array(phase_contrast_image);
-            phase_contrast_image.shape = raw_projections_in_keV.shape;
+            phase_contrast_image[energy] = np.array(phase_contrast_image[energy]);
+            phase_contrast_image[energy].shape = raw_projections_in_keV.shape;
 
+            phase_contrast_image_min = min(phase_contrast_image_min, np.min(phase_contrast_image[energy]));
+            phase_contrast_image_max = max(phase_contrast_image_min, np.max(phase_contrast_image[energy]));
+            
+        for energy in gvxr.getEnergyBins("keV"):
             # Normalise it
-            phase_contrast_image /= max(np.max(phase_contrast_image), abs(np.min(phase_contrast_image)));
-
-            raw_projections_in_keV += projection_per_energy_channel[energy] - k * phase_contrast_image;
+            phase_contrast_image[energy] /= max(phase_contrast_image_max, abs(phase_contrast_image_min));
+            raw_projections_in_keV += projection_per_energy_channel[energy] - k * phase_contrast_image[energy];
 
     # Apply the LSF line by line
     for z in range(raw_projections_in_keV.shape[0]):
@@ -1261,7 +1268,7 @@ def fitnessFunctionLaplacian(x):
 
     fitness = MAE_sinogram;
     fitness = MAE_fibre;
-    fitness = MAE_CT;
+    #fitness = MAE_CT;
     #fitness = 1 / (ZNCC_CT + 1);
 
     if best_fitness > fitness:
@@ -1323,11 +1330,11 @@ if os.path.isfile(output_directory + "/laplacian.dat"):
     fibre_radius = temp[2];
 # Perform the registration using CMA-ES
 else:
-    sigma = 0.5
-    k = 1.5;
+    sigma = 0.3
+    k = 3.5;
 
     x0 = [sigma,k,fibre_radius];
-    bounds = [[0.00001, 0.0, 0.75 * fibre_radius], [1, 15, 1.25 * fibre_radius]];
+    bounds = [[0.00001, 0.0, 0.75 * fibre_radius], [1, 10, 1.25 * fibre_radius]];
 
     best_fitness = sys.float_info.max;
     laplacian_id = 0;
@@ -1338,7 +1345,7 @@ else:
     opts['bounds'] = bounds;
     #opts['seed'] = 987654321;
     # opts['maxiter'] = 5;
-    opts['CMA_stds'] = [0.25, 1.0, fibre_radius * 0.025];
+    opts['CMA_stds'] = [0.25, 2.0, fibre_radius * 0.025];
 
 
     es = cma.CMAEvolutionStrategy(x0, 0.25, opts);
@@ -1447,9 +1454,15 @@ reference_fibre_in_centre = np.array(copy.deepcopy(g_reference_CT[best_centre[1]
 
 volume = sitk.GetImageFromArray(test_fibre_in_centre);
 volume.SetSpacing([g_pixel_spacing_in_mm, g_pixel_spacing_in_mm, g_pixel_spacing_in_mm]);
-sitk.WriteImage(volume, output_directory + "/reconstruction_CT_fibre_in_centre.mha", useCompression=True);
+sitk.WriteImage(volume, output_directory + "/simulated_fibre_in_centre.mha", useCompression=True);
 
 
+volume = sitk.GetImageFromArray(reference_fibre_in_centre);
+volume.SetSpacing([g_pixel_spacing_in_mm, g_pixel_spacing_in_mm, g_pixel_spacing_in_mm]);
+sitk.WriteImage(volume, output_directory + "/reference_fibre_in_centre.mha", useCompression=True);
+
+np.savetxt(output_directory + "/profile_reference_fibre_in_centre.txt", reference_fibre_in_centre.diagional());
+np.savetxt(output_directory + "/profile_simulated_fibre_in_centre.txt", test_fibre_in_centre.diagional());
 
 
 mask_shape = reference_fibre_in_centre.shape;
