@@ -1461,8 +1461,8 @@ volume = sitk.GetImageFromArray(reference_fibre_in_centre);
 volume.SetSpacing([g_pixel_spacing_in_mm, g_pixel_spacing_in_mm, g_pixel_spacing_in_mm]);
 sitk.WriteImage(volume, output_directory + "/reference_fibre_in_centre.mha", useCompression=True);
 
-np.savetxt(output_directory + "/profile_reference_fibre_in_centre.txt", reference_fibre_in_centre.diagional());
-np.savetxt(output_directory + "/profile_simulated_fibre_in_centre.txt", test_fibre_in_centre.diagional());
+np.savetxt(output_directory + "/profile_reference_fibre_in_centre.txt", np.diag(reference_fibre_in_centre));
+np.savetxt(output_directory + "/profile_simulated_fibre_in_centre.txt", np.diag(test_fibre_in_centre));
 
 
 mask_shape = reference_fibre_in_centre.shape;
