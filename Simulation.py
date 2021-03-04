@@ -2,6 +2,9 @@ import copy, sys
 import numpy as np
 
 from skimage.transform import iradon
+from skimage.util import compare_images
+import skimage.io as io
+
 import SimpleITK as sitk
 import cv2
 
@@ -10,12 +13,14 @@ from lsf import *
 
 
 # Global variables
+NoneType = type(None);
 pixel_spacing_in_micrometre = 1.9;
 pixel_spacing_in_mm = pixel_spacing_in_micrometre * 1e-3;
 number_of_projections = 900;
 angular_span_in_degrees = 180.0;
 angular_step = angular_span_in_degrees / number_of_projections;
 theta = np.linspace(0., angular_span_in_degrees, number_of_projections, endpoint=False);
+roi_length = 40;
 
 fibre_radius = 140 / 2; # um
 core_radius = 30 / 2; # um
@@ -25,6 +30,8 @@ num_samples = 15;
 use_fibres = False;
 
 centroid_set = None;
+matrix_geometry_parameters = None;
+cylinder_position_in_centre_of_slice = None;
 
 def createTargetFromRawSinogram(fname):
     """This function read the binary file fname. This file contains
@@ -310,27 +317,29 @@ def tomographyAcquisition():
     return raw_projections_in_keV;
 
 
-# ### Flat-filed correction
-#
-# Because the data suffers from a fixed-pattern noise in X-ray imaging in actual experiments, it is necessary to perform the flat-field correction of the raw projections using:
-#
-# $$normalised\_projections = \frac{raw\_projections − dark\_field}{flat\_field\_image − dark\_field}$$
-#
-# - $raw\_projections$ are the raw projections with the X-ray beam turned on and with the scanned object,
-# - $flat\_field\_image$ is an image with the X-ray beam turned on but without the scanned object, and
-# - $dark\_field$ is an image with the X-ray beam turned off.
-#
-# Note that in our example, $raw\_projections$, $flat\_field\_image$ and $dark\_field$ are in keV whereas $normalised\_projections$ does not have any unit:
-#
-# $$0 \leq raw\_projections \leq  \sum_E N_0(E) \times E\\0 \leq normalised\_projections \leq 1$$
-#
-# We define a new function to compute the flat-field correction.
-
-# In[ ]:
-
-
 def flatFieldCorrection(raw_projections_in_keV):
+    """This function applies the flat-field correction on raw projections.
+    Because the data suffers from a fixed-pattern noise in X-ray imaging in
+    actual experiments, it is necessary to perform the flat-field correction of
+    the raw projections using:
+
+    $$normalised\_projections = \frac{raw\_projections − dark\_field}{flat\_field\_image − dark\_field}$$
+
+    - $raw\_projections$ are the raw projections with the X-ray beam turned on and with the scanned object,
+    - $flat\_field\_image$ is an image with the X-ray beam turned on but without the scanned object, and
+    - $dark\_field$ is an image with the X-ray beam turned off.
+
+    Note that in our example, $raw\_projections$, $flat\_field\_image$ and $dark\_field$ are in keV whereas $normalised\_projections$ does not have any unit:
+
+    $$0 \leq raw\_projections \leq  \sum_E N_0(E) \times E\\0 \leq normalised\_projections \leq 1$$
+
+    Return: the projections (raw_projections_in_keV) after flat-field correction
+    """
+
+    # Create a mock dark field image
     dark_field_image = np.zeros(raw_projections_in_keV.shape);
+
+    # Create a mock flat field image
     flat_field_image = np.zeros(raw_projections_in_keV.shape);
 
     # Retrieve the total energy
@@ -342,15 +351,16 @@ def flatFieldCorrection(raw_projections_in_keV):
         total_energy += energy * count;
     flat_field_image = np.ones(raw_projections_in_keV.shape) * total_energy;
 
-    normalised_projections = (raw_projections_in_keV - dark_field_image) / (flat_field_image - dark_field_image);
+    # Apply the actual flat-field correction on the raw projections
+    return (raw_projections_in_keV - dark_field_image) / (flat_field_image - dark_field_image);
 
-    return normalised_projections;
 
-
-# In[ ]:
-
-def laplacian(x, sig):
-    kernel = (np.power(x, 2.) / np.power(sig, 4.) - 1. / np.power(sig, 2.)) * np.exp(-np.power(x, 2.) / (2 * np.power(sig, 2.)));
+def laplacian(x, sigma):
+    """This function create a Laplacian kernel with
+    $$ \frac{x^2 - \sigma^2}{\sigma^4} \times e^{-\frac{x^2}{2 \sigma^2}} $$
+    See equation (50) in http://fourier.eng.hmc.edu/e161/lectures/gradient/node8.html
+    """
+    kernel = 1. / math.sqrt(2. * math.pi * math.pow(sigma, 2)) * (np.power(x, 2.) - math.pow(sigma, 2)) / math.pow(sigma, 4) * np.exp(-np.power(x, 2) / (2 * math.pow(sigma, 2)))
 
     # Make sure the sum of all the kernel elements is NULL
     index_positive = kernel > 0.0;
@@ -381,11 +391,11 @@ def getLBuffer(object):
     # Return as a numpy array
     return np.array(L_buffer);
 
-def simulateSinogram(sigma_set = None, k_set = None):
+def simulateSinogram(sigma_set = None, k_set = None, name_set = None):
 
 
     # Do not simulate the phase contrast using a Laplacian
-    if isinstance(sigma_set, type(None)) or isinstance(k_set, type(None)):
+    if isinstance(sigma_set, NoneType) or isinstance(k_set, NoneType) or isinstance(name_set, NoneType):
 
         # Get the raw projections in keV
         raw_projections_in_keV = tomographyAcquisition();
@@ -401,9 +411,12 @@ def simulateSinogram(sigma_set = None, k_set = None):
         L_buffer_set = {};
 
         # Look at all the children of the root node
-        for label, sigma in zip(["core", "fibre", "matrix"], sigma_set):
+        for label in ["core", "fibre", "matrix"]:
             # Get its L-buffer
             L_buffer_set[label] = getLBuffer(label);
+
+        for label, sigma in zip(name_set, sigma_set):
+            # Get its Laplacian
             laplacian_kernels[label] = laplacian(pixel_range, sigma);
 
         # For each energy in the beam spectrum
@@ -415,8 +428,8 @@ def simulateSinogram(sigma_set = None, k_set = None):
         # Create a blank image
         raw_projections_in_keV = np.zeros(L_buffer_set["fibre"].shape);
 
-        phase_contrast_image_min = sys.float_info.max;
-        phase_contrast_image_max = -sys.float_info.max;
+        # phase_contrast_image_min = sys.float_info.max;
+        # phase_contrast_image_max = -sys.float_info.max;
 
         for energy, photon_count in zip(gvxr.getEnergyBins("keV"), gvxr.getPhotonCountEnergyBins()):
 
@@ -426,25 +439,27 @@ def simulateSinogram(sigma_set = None, k_set = None):
 
             # Look at all the children of the root node
             #for label in ["core", "fibre", "matrix"]:
-            for label, sigma, in zip(["core", "fibre", "matrix"], sigma_set):
+            for label_object in ["core", "fibre", "matrix"]:
                 # Get mu for this object for this energy
-                mu = gvxr.getLinearAttenuationCoefficient(label, energy, "keV");
+                mu = gvxr.getLinearAttenuationCoefficient(label_object, energy, "keV");
 
                 # Compute mu * x
-                temp = L_buffer_set[label] * mu;
+                temp = L_buffer_set[label_object] * mu;
                 attenuation[energy] += temp;
 
-                phase_contrast_image[energy][label] = [];
+                phase_contrast_image[energy][label_object] = [];
 
-                for y in range(attenuation[energy].shape[1]):
-                    for x in range(attenuation[energy].shape[0]):
-                        phase_contrast_image[energy][label].append(np.convolve(temp[x][y], laplacian_kernels[label], mode='same'));
+                for label_laplacian, sigma in zip(name_set, sigma_set):
+                    if label_object == label_laplacian:
+                        for y in range(attenuation[energy].shape[1]):
+                            for x in range(attenuation[energy].shape[0]):
+                                phase_contrast_image[energy][label_laplacian].append(np.convolve(temp[x][y], laplacian_kernels[label_laplacian], mode='same'));
 
-                phase_contrast_image[energy][label] = np.array(phase_contrast_image[energy][label]);
-                phase_contrast_image[energy][label].shape = L_buffer_set[label].shape;
+                        phase_contrast_image[energy][label_laplacian] = np.array(phase_contrast_image[energy][label_laplacian]);
+                        phase_contrast_image[energy][label_laplacian].shape = L_buffer_set[label_object].shape;
 
-                phase_contrast_image_min = min(phase_contrast_image_min, np.min(phase_contrast_image[energy][label]));
-                phase_contrast_image_max = max(phase_contrast_image_min, np.max(phase_contrast_image[energy][label]));
+                # phase_contrast_image_min = min(phase_contrast_image_min, np.min(phase_contrast_image[energy][label]));
+                # phase_contrast_image_max = max(phase_contrast_image_min, np.max(phase_contrast_image[energy][label]));
 
             # Store the projection for this energy channel
             projection_per_energy_channel[energy] = energy * photon_count * np.exp(-attenuation[energy]);
@@ -454,7 +469,7 @@ def simulateSinogram(sigma_set = None, k_set = None):
 
         for energy in gvxr.getEnergyBins("keV"):
             raw_projections_in_keV += projection_per_energy_channel[energy];
-            for label, k in zip(["core", "fibre", "matrix"], k_set):
+            for label, k in zip(name_set, k_set):
                 # Normalise it
                 #phase_contrast_image[energy][label] /= max(phase_contrast_image_max, abs(phase_contrast_image_min));
 
@@ -477,6 +492,9 @@ def fitnessFunctionCube(x):
     global reference_sinogram;
     global centroid_set;
     global use_fibres;
+
+    global core_radius;
+    global fibre_radius;
 
     setMatrix(x);
 
@@ -506,7 +524,8 @@ def float2uint8(anImage):
 
 
 def findCircles(anInputVolume):
-    # Convert in UINT8 and into a SITK image
+
+    # Convert the numpy array in float32 into uint8, then into a SITK image
     volume = sitk.GetImageFromArray(float2uint8(anInputVolume));
     volume.SetSpacing([pixel_spacing_in_mm, pixel_spacing_in_mm, pixel_spacing_in_mm]);
 
@@ -519,26 +538,9 @@ def findCircles(anInputVolume):
     # Print the corresponding threshold
     print("Threshold:", otsu_filter.GetThreshold());
 
-
-    # In[40]:
-
-
-
-    # ### Clean up
-
-    # In[42]:
-
-
+    # Clean-up using mathematical morphology
     cleaned_thresh_img = sitk.BinaryOpeningByReconstruction(seg, [3, 3, 3])
     cleaned_thresh_img = sitk.BinaryClosingByReconstruction(cleaned_thresh_img, [3, 3, 3])
-
-
-    # In[43]:
-
-
-
-
-    # In[44]:
 
 
     # ### Size of objects
@@ -631,13 +633,15 @@ def refineCentrePositions(centroid_set, reconstruction_CT_fibres):
 def fitnessFunctionFibres(x):
     global best_fitness;
     global radius_fibre_id;
+    global fibre_radius;
+    global core_radius;
 
     # Get the radii
     fibre_radius = x[0];
     core_radius = fibre_radius * x[1];
 
     # Load the matrix
-    setMatrix(current_best);
+    setMatrix(matrix_geometry_parameters);
 
     # Load the cores and fibres
     setFibres(centroid_set);
@@ -663,6 +667,7 @@ def fitnessFunctionFibres(x):
 
     # Save the data
     fitness = MAE;
+
     # if best_fitness > fitness:
     #     best_fitness = fitness;
 
@@ -676,29 +681,23 @@ def fitnessFunctionLaplacian(x):
     global laplacian_id;
     global value_range;
     global num_samples;
-    global best_centre;
+    global cylinder_position_in_centre_of_slice;
+    global roi_length;
+    global fibre_radius;
+    global core_radius;
 
-    sigma_core = x[0];
-    sigma_fibre = x[1];
-    sigma_matrix = x[2];
-    k_core = x[3];
-    k_fibre = x[4];
-    k_matrix = x[5];
-    # value_range = x[2];
-    # num_samples = x[3];
-
-    # Get the radii
-    # fibre_radius = x[4];
-    fibre_radius = x[6];
+    sigma_fibre = x[0];
+    k_fibre = x[1];
+    fibre_radius = x[2];
 
     # Load the matrix
-    setMatrix(current_best);
+    setMatrix(matrix_geometry_parameters);
 
     # Load the cores and fibres
     setFibres(centroid_set);
 
     # Simulate a sinogram
-    simulated_sinogram, normalised_projections, raw_projections_in_keV = simulateSinogram([sigma_core, sigma_fibre, sigma_matrix], [k_core, k_fibre, k_matrix]);
+    simulated_sinogram, normalised_projections, raw_projections_in_keV = simulateSinogram([sigma_fibre], [k_fibre], ["fibre"]);
     normalised_simulated_sinogram = (simulated_sinogram - simulated_sinogram.mean()) / simulated_sinogram.std();
     MAE_sinogram = np.mean(np.abs(normalised_simulated_sinogram.flatten() - normalised_reference_sinogram.flatten()));
     ZNCC_sinogram = np.mean(np.multiply(normalised_simulated_sinogram.flatten(), normalised_reference_sinogram.flatten()));
@@ -708,8 +707,8 @@ def fitnessFunctionLaplacian(x):
     CT_laplacian = iradon(simulated_sinogram.T, theta=theta, circle=True);
     normalised_CT_laplacian = (CT_laplacian - CT_laplacian.mean()) / CT_laplacian.std();
 
-    reference_image = copy.deepcopy(reference_CT[best_centre[1] - roi_length:best_centre[1] + roi_length, best_centre[0] - roi_length:best_centre[0] + roi_length]);
-    test_image = copy.deepcopy(CT_laplacian[best_centre[1] - roi_length:best_centre[1] + roi_length, best_centre[0] - roi_length:best_centre[0] + roi_length]);
+    reference_image = copy.deepcopy(reference_CT[cylinder_position_in_centre_of_slice[1] - roi_length:cylinder_position_in_centre_of_slice[1] + roi_length, cylinder_position_in_centre_of_slice[0] - roi_length:cylinder_position_in_centre_of_slice[0] + roi_length]);
+    test_image = copy.deepcopy(CT_laplacian[cylinder_position_in_centre_of_slice[1] - roi_length:cylinder_position_in_centre_of_slice[1] + roi_length, cylinder_position_in_centre_of_slice[0] - roi_length:cylinder_position_in_centre_of_slice[0] + roi_length]);
 
     # MAE_sinogram = np.mean(np.abs(np.subtract(reference_sinogram.flatten(), simulated_sinogram.flatten())));
 
@@ -773,45 +772,101 @@ def fitnessFunctionLaplacian(x):
     fitness = MAE_CT;
     #fitness = 1 / (ZNCC_CT + 1);
 
-    if best_fitness > fitness:
-        best_fitness = fitness;
-
-
-        volume = sitk.GetImageFromArray(CT_laplacian);
-        volume.SetSpacing([pixel_spacing_in_mm, pixel_spacing_in_mm, pixel_spacing_in_mm]);
-        sitk.WriteImage(volume, output_directory + "/reconstruction_CT_laplacian_" + str(laplacian_id) + ".mha", useCompression=True);
-
-        volume = sitk.GetImageFromArray(CT_laplacian[best_centre[1] - roi_length:best_centre[1] + roi_length,
-                                        best_centre[0] - roi_length:best_centre[0] + roi_length]);
-        volume.SetSpacing([pixel_spacing_in_mm, pixel_spacing_in_mm, pixel_spacing_in_mm]);
-        sitk.WriteImage(volume, output_directory + "/reconstruction_CT_laplacian_fibre_centre_" + str(laplacian_id) + ".mha", useCompression=True);
-
-        comp_equalized = compare_images(reference_image, test_image, method='checkerboard');
-        volume = sitk.GetImageFromArray(comp_equalized)
-        sitk.WriteImage(volume, output_directory + "/laplacian_comp_fibre_" + str(laplacian_id) + ".mha", useCompression=True);
-
-        comp_equalized -= np.min(comp_equalized);
-        comp_equalized /= np.max(comp_equalized);
-        comp_equalized *= 255;
-        comp_equalized = np.array(comp_equalized, dtype=np.uint8);
-        io.imsave(output_directory + "/laplacian_comp_fibre_" + str(laplacian_id) + ".png", comp_equalized);
-
-        comp_equalized = compare_images(reference_CT, CT_laplacian, method='checkerboard');
-        volume = sitk.GetImageFromArray(comp_equalized)
-        sitk.WriteImage(volume, output_directory + "/laplacian_comp_slice_" + str(laplacian_id) + ".mha", useCompression=True);
-
-        comp_equalized -= np.min(comp_equalized);
-        comp_equalized /= np.max(comp_equalized);
-        comp_equalized *= 255;
-        comp_equalized = np.array(comp_equalized, dtype=np.uint8);
-        io.imsave(output_directory + "/laplacian_comp_slice_" + str(laplacian_id) + ".png", comp_equalized);
-
-        laplacian_id += 1;
+    # if best_fitness > fitness:
+    #     best_fitness = fitness;
+    #
+    #
+    #     volume = sitk.GetImageFromArray(CT_laplacian);
+    #     volume.SetSpacing([pixel_spacing_in_mm, pixel_spacing_in_mm, pixel_spacing_in_mm]);
+    #     sitk.WriteImage(volume, output_directory + "/reconstruction_CT_laplacian_" + str(laplacian_id) + ".mha", useCompression=True);
+    #
+    #     volume = sitk.GetImageFromArray(CT_laplacian[cylinder_position_in_centre_of_slice[1] - roi_length:cylinder_position_in_centre_of_slice[1] + roi_length,
+    #                                     cylinder_position_in_centre_of_slice[0] - roi_length:cylinder_position_in_centre_of_slice[0] + roi_length]);
+    #     volume.SetSpacing([pixel_spacing_in_mm, pixel_spacing_in_mm, pixel_spacing_in_mm]);
+    #     sitk.WriteImage(volume, output_directory + "/reconstruction_CT_laplacian_fibre_centre_" + str(laplacian_id) + ".mha", useCompression=True);
+    #
+    #     comp_equalized = compare_images(reference_image, test_image, method='checkerboard');
+    #     volume = sitk.GetImageFromArray(comp_equalized)
+    #     sitk.WriteImage(volume, output_directory + "/laplacian_comp_fibre_" + str(laplacian_id) + ".mha", useCompression=True);
+    #
+    #     comp_equalized -= np.min(comp_equalized);
+    #     comp_equalized /= np.max(comp_equalized);
+    #     comp_equalized *= 255;
+    #     comp_equalized = np.array(comp_equalized, dtype=np.uint8);
+    #     io.imsave(output_directory + "/laplacian_comp_fibre_" + str(laplacian_id) + ".png", comp_equalized);
+    #
+    #     comp_equalized = compare_images(reference_CT, CT_laplacian, method='checkerboard');
+    #     volume = sitk.GetImageFromArray(comp_equalized)
+    #     sitk.WriteImage(volume, output_directory + "/laplacian_comp_slice_" + str(laplacian_id) + ".mha", useCompression=True);
+    #
+    #     comp_equalized -= np.min(comp_equalized);
+    #     comp_equalized /= np.max(comp_equalized);
+    #     comp_equalized *= 255;
+    #     comp_equalized = np.array(comp_equalized, dtype=np.uint8);
+    #     io.imsave(output_directory + "/laplacian_comp_slice_" + str(laplacian_id) + ".png", comp_equalized);
+    #
+    #     laplacian_id += 1;
 
 
     reference_image = (reference_image - reference_image.mean()) / reference_image.std();
     test_image = (test_image - test_image.mean()) / test_image.std();
     ZNCC_fibre = np.mean(np.multiply(reference_image.flatten(), test_image.flatten()));
-    print("IND", x[0], x[1], x[2], x[3], x[4], x[5], x[6], MAE_sinogram, ZNCC_sinogram, MAE_CT, ZNCC_CT, MAE_fibre, ZNCC_fibre);
+    print("IND", x[0], x[1], x[2], MAE_sinogram, ZNCC_sinogram, MAE_CT, ZNCC_CT, MAE_fibre, ZNCC_fibre);
 
     return fitness;
+
+
+
+def reconstructAndStoreResults(simulated_sinogram, aPrefix):
+
+    global reference_CT;
+    global normalised_reference_CT;
+    global cylinder_position_in_centre_of_slice;
+
+    # Reconstruct the CT slice
+    simulated_sinogram.shape = (simulated_sinogram.size // simulated_sinogram.shape[2], simulated_sinogram.shape[2]);
+    CT_slice_from_simulated_sinogram = iradon(simulated_sinogram.T, theta=theta, circle=True);
+
+    # Save the CT slice
+    volume = sitk.GetImageFromArray(CT_slice_from_simulated_sinogram);
+    volume.SetSpacing([pixel_spacing_in_mm, pixel_spacing_in_mm, pixel_spacing_in_mm]);
+    sitk.WriteImage(volume, aPrefix + "_CT_slice.mha", useCompression=True);
+
+    # Compute a mosaic in linear attenuation coefficients
+    comp_equalized = compare_images(reference_CT, CT_slice_from_simulated_sinogram, method='checkerboard');
+    volume = sitk.GetImageFromArray(comp_equalized);
+    volume.SetSpacing([pixel_spacing_in_mm, pixel_spacing_in_mm, pixel_spacing_in_mm]);
+    sitk.WriteImage(volume, aPrefix + "_compare_experiment_with_simulation.mha", useCompression=True);
+
+    # Compute a mosaic after zero-mean, unit variance normalisation
+    normalised_CT_slice = (CT_slice_from_simulated_sinogram - CT_slice_from_simulated_sinogram.mean()) / CT_slice_from_simulated_sinogram.std();
+    comp_equalized = compare_images(normalised_reference_CT, normalised_CT_slice, method='checkerboard');
+    comp_equalized -= np.min(comp_equalized);
+    comp_equalized /= np.max(comp_equalized);
+    comp_equalized *= 255;
+    comp_equalized = np.array(comp_equalized, dtype=np.uint8);
+    io.imsave(aPrefix + "_compare_experiment_with_simulation.png", comp_equalized)
+
+    # Compute the ZNCC
+    ZNCC_CT = np.mean(np.multiply(normalised_CT_slice.flatten(), normalised_reference_CT.flatten()));
+
+    return ZNCC_CT, CT_slice_from_simulated_sinogram;
+
+
+def findFibreInCentreOfCtSlice():
+    global centroid_set;
+    global reference_CT;
+    global cylinder_position_in_centre_of_slice;
+
+    # Find the cylinder in the centre of the image
+    cylinder_position_in_centre_of_slice = None;
+    best_distance = sys.float_info.max;
+
+    for centre in centroid_set:
+        distance = math.pow(centre[0] - reference_CT.shape[1] / 2,2 ) + math.pow(centre[1] - reference_CT.shape[0] / 2, 2);
+
+        if best_distance > distance:
+            best_distance = distance;
+            cylinder_position_in_centre_of_slice = copy.deepcopy(centre);
+
+    return cylinder_position_in_centre_of_slice;
