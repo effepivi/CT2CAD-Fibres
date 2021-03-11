@@ -11,7 +11,7 @@ import numpy as np
 from skimage.transform import iradon
 
 import matplotlib
-matplotlib.use('TkAGG')   # generate postscript output by default
+matplotlib.use('AGG')   # generate postscript output by default
 
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
