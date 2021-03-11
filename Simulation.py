@@ -454,10 +454,10 @@ def simulateSinogram(sigma_set = None, k_set = None, name_set = None):
         # Apply the phase contrastt
         raw_projections_in_keV -= phase_contrast_image;
 
-        phase_contrast_image.shape = [900, 1024];
-        volume = sitk.GetImageFromArray(phase_contrast_image);
-        # volume.SetSpacing([pixel_spacing_in_mm, pixel_spacing_in_mm, pixel_spacing_in_mm]);
-        sitk.WriteImage(volume, output_directory + "/phase_contrast_image.mha", useCompression=True);
+        # phase_contrast_image.shape = [900, 1024];
+        # volume = sitk.GetImageFromArray(phase_contrast_image);
+        # # volume.SetSpacing([pixel_spacing_in_mm, pixel_spacing_in_mm, pixel_spacing_in_mm]);
+        # sitk.WriteImage(volume, output_directory + "/phase_contrast_image.mha", useCompression=True);
 
     # Apply the LSF line by line
     for z in range(raw_projections_in_keV.shape[0]):
@@ -672,9 +672,13 @@ def fitnessFunctionLaplacian(x):
     global fibre_radius;
     global core_radius;
 
-    sigma_fibre = x[0];
-    k_fibre = x[1];
-    fibre_radius = x[2];
+    sigma_core = x[0];
+    k_core = x[1];
+    sigma_fibre = x[2];
+    k_fibre = x[3];
+    sigma_matrix = x[4];
+    k_matrix = x[5];
+    fibre_radius = x[6];
 
     # Load the matrix
     setMatrix(matrix_geometry_parameters);
@@ -683,7 +687,7 @@ def fitnessFunctionLaplacian(x):
     setFibres(centroid_set);
 
     # Simulate a sinogram
-    simulated_sinogram, normalised_projections, raw_projections_in_keV = simulateSinogram([sigma_fibre], [k_fibre], ["fibre"]);
+    simulated_sinogram, normalised_projections, raw_projections_in_keV = simulateSinogram([sigma_core, sigma_fibre, sigma_matrix], [k_core, k_fibre, k_matrix], ["core", "fibre", "matrix"]);
     normalised_simulated_sinogram = (simulated_sinogram - simulated_sinogram.mean()) / simulated_sinogram.std();
     MAE_sinogram = np.mean(np.abs(normalised_simulated_sinogram.flatten() - normalised_reference_sinogram.flatten()));
     ZNCC_sinogram = np.mean(np.multiply(normalised_simulated_sinogram.flatten(), normalised_reference_sinogram.flatten()));
@@ -803,7 +807,7 @@ def fitnessFunctionLaplacian(x):
     # reference_image = (reference_image - reference_image.mean()) / reference_image.std();
     # test_image = (test_image - test_image.mean()) / test_image.std();
     # ZNCC_fibre = np.mean(np.multiply(reference_image.flatten(), test_image.flatten()));
-    print("IND", x[0], x[1], x[2], fitness, ZNCC_sinogram);
+    print("IND", x[0], x[1], x[2], x[3], x[4], x[5], x[6], fitness, ZNCC_sinogram);
 
     return fitness;
 

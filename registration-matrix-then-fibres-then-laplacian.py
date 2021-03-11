@@ -94,139 +94,139 @@ Simulation.initGVXR();
 
 
 
-sigma_core = 0.15;
-sigma_fibre = 1.5;
-sigma_matrix = 0.2;
-
-k_core = 5;
-k_fibre = 1;
-k_matrix = 2.0;
-
-
-x = np.linspace(-Simulation.value_range, Simulation.value_range, num=int(Simulation.num_samples), endpoint=True)
-laplacian_kernel = Simulation.laplacian(x, sigma_fibre);
-
-print(np.sum(laplacian_kernel));
-
-fig, ax = plt.subplots()
-plt.subplots_adjust(left=0.25, bottom=0.25)
-l, = plt.plot(x, laplacian_kernel * k_fibre, lw=2);
-
-axcolor = 'lightgoldenrodyellow'
-axfreq = plt.axes([0.25, 0.1, 0.65, 0.03], facecolor=axcolor)
-axamp = plt.axes([0.25, 0.15, 0.65, 0.03], facecolor=axcolor)
-
-delta_f = 0.05
-sfreq = Slider(axfreq, 'Sigma', 0.0001, 3.5, valinit=sigma_fibre, valstep=delta_f)
-samp = Slider(axamp, 'k', 0.0, 5000.0, valinit=k_fibre)
-
-resetax = plt.axes([0.8, 0.025, 0.1, 0.04])
-button = Button(resetax, 'Apply', color=axcolor, hovercolor='0.975')
-
-
-
-
-fibre_L_buffer  = sitk.GetArrayFromImage(sitk.ReadImage(output_directory + "/l_buffer_fibre.mha"));
-core_L_buffer   = sitk.GetArrayFromImage(sitk.ReadImage(output_directory + "/l_buffer_core.mha"));
-matrix_L_buffer = sitk.GetArrayFromImage(sitk.ReadImage(output_directory + "/l_buffer_matrix.mha"));
-
-
-def simulateAndReconstruct():
-    global sigma_fibre, k_fibre, samp, sfreq, laplacian_kernel, x;
-    global fibre_L_buffer, core_L_buffer, matrix_L_buffer;
-
-    k_fibre = samp.val
-    sigma_fibre = sfreq.val
-    laplacian_kernel = Simulation.laplacian(x, sigma_fibre);
-
-    projection = np.zeros(fibre_L_buffer.shape);
-    phase_contrast_image = np.zeros(fibre_L_buffer.shape);
-
-    total_energy = 0.0;
-
-    attenuation =  core_L_buffer * 348.9097883430308 + matrix_L_buffer * 16.53631368289138;
-    projection = 32.999999821186066 * 0.9700000286102295 * np.exp(-attenuation);
-
-    attenuation =  core_L_buffer * 56.46307119094464 + matrix_L_buffer * 2.708343134657077;
-    projection += 65.99999964237213 * 0.019999999552965164 * np.exp(-attenuation);
-    #
-    attenuation =  core_L_buffer * 87.90873756872163 + matrix_L_buffer * 1.2023011012123404;
-    projection += 98.9999994635582 * 0.009999999776482582 * np.exp(-attenuation);
-
-
-    for y in range(fibre_L_buffer.shape[0]):
-        phase_contrast_image[y] += np.convolve((fibre_L_buffer)[y], laplacian_kernel, mode='same');
-        # phase_contrast_image[y] += np.convolve((core_L_buffer)[y], laplacian_kernel, mode='same');
-        # phase_contrast_image[y] += np.convolve((matrix_L_buffer)[y], laplacian_kernel, mode='same');
-
-    phase_contrast_image *= k_fibre;
-
-    volume = sitk.GetImageFromArray(phase_contrast_image);
-    # volume.SetSpacing([pixel_spacing_in_mm, pixel_spacing_in_mm, pixel_spacing_in_mm]);
-    sitk.WriteImage(volume, output_directory + "/phase_contrast_image.mha", useCompression=True);
-
-
-    projection -= phase_contrast_image;
-
-    projection /= 32.999999821186066 * 0.9700000286102295 #+ 65.99999964237213 * 0.019999999552965164 + 98.9999994635582 * 0.009999999776482582;
-
-    threshold = 1e-6
-    projection[projection < threshold] = threshold;
-
-    simulated_sinogram = -np.log(projection);
-    simulated_sinogram /= Simulation.pixel_spacing_in_micrometre * gvxr.getUnitOfLength("um") / gvxr.getUnitOfLength("cm");
-
-
-
-    volume = sitk.GetImageFromArray(simulated_sinogram);
-    sitk.WriteImage(volume, output_directory + "/sinogram_with_laplacian.mha", useCompression=True);
-
-    CT_laplacian = iradon(simulated_sinogram.T, theta=Simulation.theta, circle=True);
-
-    volume = sitk.GetImageFromArray(CT_laplacian);
-    # volume.SetSpacing([pixel_spacing_in_mm, pixel_spacing_in_mm, pixel_spacing_in_mm]);
-    sitk.WriteImage(volume, output_directory + "/CT_with_laplacian.mha", useCompression=True);
-
-    return CT_laplacian;
-
-
-CT_laplacian = simulateAndReconstruct();
-fig2, ax2 = plt.subplots()
-fig_img = plt.imshow(CT_laplacian)
-fig_img.set_cmap('gray')
-
-
-def update(val):
-    global sigma_fibre, k_fibre, x, laplacian_kernel;
-
-    k_fibre = samp.val
-    sigma_fibre = sfreq.val
-    laplacian_kernel = Simulation.laplacian(x, sigma_fibre);
-
-    l.set_ydata(laplacian_kernel * k_fibre)
-    ax.set_ylim(np.min(laplacian_kernel * k_fibre), np.max(laplacian_kernel * k_fibre))
-
-    fig.canvas.draw_idle()
-
-
-sfreq.on_changed(update)
-samp.on_changed(update)
-
-
-
-def reset(event):
-
-    global sigma_fibre, k_fibre;
-
-    fig_img.set_data(simulateAndReconstruct());
-    fig2.canvas.draw_idle()
-
-
-
-
-
-
-button.on_clicked(reset)
+# sigma_core = 0.15;
+# sigma_fibre = 1.5;
+# sigma_matrix = 0.2;
+#
+# k_core = 5;
+# k_fibre = 1;
+# k_matrix = 2.0;
+#
+#
+# x = np.linspace(-Simulation.value_range, Simulation.value_range, num=int(Simulation.num_samples), endpoint=True)
+# laplacian_kernel = Simulation.laplacian(x, sigma_fibre);
+#
+# print(np.sum(laplacian_kernel));
+#
+# fig, ax = plt.subplots()
+# plt.subplots_adjust(left=0.25, bottom=0.25)
+# l, = plt.plot(x, laplacian_kernel * k_fibre, lw=2);
+#
+# axcolor = 'lightgoldenrodyellow'
+# axfreq = plt.axes([0.25, 0.1, 0.65, 0.03], facecolor=axcolor)
+# axamp = plt.axes([0.25, 0.15, 0.65, 0.03], facecolor=axcolor)
+#
+# delta_f = 0.05
+# sfreq = Slider(axfreq, 'Sigma', 0.0001, 3.5, valinit=sigma_fibre, valstep=delta_f)
+# samp = Slider(axamp, 'k', 0.0, 5000.0, valinit=k_fibre)
+#
+# resetax = plt.axes([0.8, 0.025, 0.1, 0.04])
+# button = Button(resetax, 'Apply', color=axcolor, hovercolor='0.975')
+#
+#
+#
+#
+# fibre_L_buffer  = sitk.GetArrayFromImage(sitk.ReadImage(output_directory + "/l_buffer_fibre.mha"));
+# core_L_buffer   = sitk.GetArrayFromImage(sitk.ReadImage(output_directory + "/l_buffer_core.mha"));
+# matrix_L_buffer = sitk.GetArrayFromImage(sitk.ReadImage(output_directory + "/l_buffer_matrix.mha"));
+#
+#
+# def simulateAndReconstruct():
+#     global sigma_fibre, k_fibre, samp, sfreq, laplacian_kernel, x;
+#     global fibre_L_buffer, core_L_buffer, matrix_L_buffer;
+#
+#     k_fibre = samp.val
+#     sigma_fibre = sfreq.val
+#     laplacian_kernel = Simulation.laplacian(x, sigma_fibre);
+#
+#     projection = np.zeros(fibre_L_buffer.shape);
+#     phase_contrast_image = np.zeros(fibre_L_buffer.shape);
+#
+#     total_energy = 0.0;
+#
+#     attenuation =  core_L_buffer * 348.9097883430308 + matrix_L_buffer * 16.53631368289138;
+#     projection = 32.999999821186066 * 0.9700000286102295 * np.exp(-attenuation);
+#
+#     attenuation =  core_L_buffer * 56.46307119094464 + matrix_L_buffer * 2.708343134657077;
+#     projection += 65.99999964237213 * 0.019999999552965164 * np.exp(-attenuation);
+#     #
+#     attenuation =  core_L_buffer * 87.90873756872163 + matrix_L_buffer * 1.2023011012123404;
+#     projection += 98.9999994635582 * 0.009999999776482582 * np.exp(-attenuation);
+#
+#
+#     for y in range(fibre_L_buffer.shape[0]):
+#         phase_contrast_image[y] += np.convolve((fibre_L_buffer)[y], laplacian_kernel, mode='same');
+#         # phase_contrast_image[y] += np.convolve((core_L_buffer)[y], laplacian_kernel, mode='same');
+#         # phase_contrast_image[y] += np.convolve((matrix_L_buffer)[y], laplacian_kernel, mode='same');
+#
+#     phase_contrast_image *= k_fibre;
+#
+#     volume = sitk.GetImageFromArray(phase_contrast_image);
+#     # volume.SetSpacing([pixel_spacing_in_mm, pixel_spacing_in_mm, pixel_spacing_in_mm]);
+#     sitk.WriteImage(volume, output_directory + "/phase_contrast_image.mha", useCompression=True);
+#
+#
+#     projection -= phase_contrast_image;
+#
+#     projection /= 32.999999821186066 * 0.9700000286102295 #+ 65.99999964237213 * 0.019999999552965164 + 98.9999994635582 * 0.009999999776482582;
+#
+#     threshold = 1e-6
+#     projection[projection < threshold] = threshold;
+#
+#     simulated_sinogram = -np.log(projection);
+#     simulated_sinogram /= Simulation.pixel_spacing_in_micrometre * gvxr.getUnitOfLength("um") / gvxr.getUnitOfLength("cm");
+#
+#
+#
+#     volume = sitk.GetImageFromArray(simulated_sinogram);
+#     sitk.WriteImage(volume, output_directory + "/sinogram_with_laplacian.mha", useCompression=True);
+#
+#     CT_laplacian = iradon(simulated_sinogram.T, theta=Simulation.theta, circle=True);
+#
+#     volume = sitk.GetImageFromArray(CT_laplacian);
+#     # volume.SetSpacing([pixel_spacing_in_mm, pixel_spacing_in_mm, pixel_spacing_in_mm]);
+#     sitk.WriteImage(volume, output_directory + "/CT_with_laplacian.mha", useCompression=True);
+#
+#     return CT_laplacian;
+#
+#
+# CT_laplacian = simulateAndReconstruct();
+# fig2, ax2 = plt.subplots()
+# fig_img = plt.imshow(CT_laplacian)
+# fig_img.set_cmap('gray')
+#
+#
+# def update(val):
+#     global sigma_fibre, k_fibre, x, laplacian_kernel;
+#
+#     k_fibre = samp.val
+#     sigma_fibre = sfreq.val
+#     laplacian_kernel = Simulation.laplacian(x, sigma_fibre);
+#
+#     l.set_ydata(laplacian_kernel * k_fibre)
+#     ax.set_ylim(np.min(laplacian_kernel * k_fibre), np.max(laplacian_kernel * k_fibre))
+#
+#     fig.canvas.draw_idle()
+#
+#
+# sfreq.on_changed(update)
+# samp.on_changed(update)
+#
+#
+#
+# def reset(event):
+#
+#     global sigma_fibre, k_fibre;
+#
+#     fig_img.set_data(simulateAndReconstruct());
+#     fig2.canvas.draw_idle()
+#
+#
+#
+#
+#
+#
+# button.on_clicked(reset)
 
 
 
@@ -507,22 +507,27 @@ if not DEBUG_FLAG:
 # The registration has already been performed. Load the results.
 if os.path.isfile(output_directory + "/laplacian1.dat"):
     temp = np.loadtxt(output_directory + "/laplacian1.dat");
-    sigma_fibre = temp[0];
-    k_fibre = temp[1];
-    Simulation.fibre_radius = temp[2];
+    sigma_core = temp[0];
+    k_core = temp[1];
+    sigma_fibre = temp[2];
+    k_fibre = temp[3];
+    sigma_matrix = temp[4];
+    k_matrix = temp[5];
+    Simulation.fibre_radius = temp[6];
 # Perform the registration using CMA-ES
 else:
 
-    sigma_core = 0.15;
-    sigma_fibre = 1.5;
-    sigma_matrix = 0.2;
+    sigma_core = 1.5;
+    sigma_fibre = 0.9;
+    sigma_matrix = 0.35;
 
-    k_core = 5;
-    k_fibre = 100;
-    k_matrix = 2.0;
+    k_core = 1;
+    k_fibre = 150;
+    k_matrix = 20.0;
 
-    x0 = [sigma_fibre, k_fibre, Simulation.fibre_radius];
-    bounds = [[0.005, 0.0, 0.95 * Simulation.fibre_radius], [2.5, 150, 1.15 * Simulation.fibre_radius]];
+    x0 = [sigma_core, k_core, sigma_fibre, k_fibre, sigma_matrix, k_matrix, Simulation.fibre_radius];
+    bounds = [[0.005, 0.0, 0.005, 0.0, 0.005, 0.0, 0.95 * Simulation.fibre_radius],
+              [2.5, 250, 2.5, 250, 2.5, 250, 1.15 * Simulation.fibre_radius]];
 
     best_fitness = sys.float_info.max;
     laplacian_id = 0;
@@ -533,7 +538,7 @@ else:
     opts['bounds'] = bounds;
     #opts['seed'] = 987654321;
     # opts['maxiter'] = 5;
-    opts['CMA_stds'] = [0.25, 10.25, Simulation.fibre_radius * 0.1];
+    opts['CMA_stds'] = [0.25, 20.25, 0.25, 20.25, 0.25, 20.25, Simulation.fibre_radius * 0.1];
 
 
     es = cma.CMAEvolutionStrategy(x0, 0.25, opts);
@@ -541,11 +546,15 @@ else:
     elapsed_time = time.time() - start_time
     print("LAPLACIAN1",elapsed_time);
 
-    sigma_fibre = es.result.xbest[0];
-    k_fibre = es.result.xbest[1];
-    Simulation.fibre_radius = es.result.xbest[2];
+    sigma_core = es.result.xbest[0];
+    k_core = es.result.xbest[1];
+    sigma_fibre = es.result.xbest[2];
+    k_fibre = es.result.xbest[3];
+    sigma_matrix = es.result.xbest[4];
+    k_matrix = es.result.xbest[5];
+    Simulation.fibre_radius = es.result.xbest[6];
 
-    np.savetxt(output_directory + "/laplacian1.dat", [sigma_fibre, k_fibre, Simulation.fibre_radius], header='sigma_fibre,k_fibre,fibre_radius_in_um');
+    np.savetxt(output_directory + "/laplacian1.dat", [sigma_core, k_core, sigma_fibre, k_fibre, sigma_matrix, k_matrix, Simulation.fibre_radius], header='sigma_core, k_core, sigma_fibre, k_fibre, sigma_matrix, k_matrix, fibre_radius_in_um');
 
 # Apply the result of the registration
 Simulation.setMatrix(Simulation.matrix_geometry_parameters);
