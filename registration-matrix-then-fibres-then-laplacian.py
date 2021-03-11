@@ -533,13 +533,14 @@ else:
     laplacian_id = 0;
 
     opts = cma.CMAOptions()
-    opts.set('tolfun', 1e-6);
-    opts['tolx'] = 1e-6;
+    opts.set('tolfun', 1e-4);
+    opts['tolx'] = 1e-4;
     opts['bounds'] = bounds;
     #opts['seed'] = 987654321;
     # opts['maxiter'] = 5;
     opts['CMA_stds'] = [0.25, 20.25, 0.25, 20.25, 0.25, 20.25, Simulation.fibre_radius * 0.1];
 
+    #IND 1.1483786225961983 0.009613492090135059 0.907846577836233 149.9477015375008 0.3522269950392328 1.5680210949532862 53.342509992423125 0.08529454365982699 0.9926270765693282
 
     es = cma.CMAEvolutionStrategy(x0, 0.25, opts);
     es.optimize(Simulation.fitnessFunctionLaplacian);
@@ -561,16 +562,23 @@ Simulation.setMatrix(Simulation.matrix_geometry_parameters);
 Simulation.setFibres(Simulation.centroid_set);
 
 # Simulate the corresponding CT aquisition
-simulated_sinogram, normalised_projections, raw_projections_in_keV = Simulation.simulateSinogram([sigma_fibre], [k_fibre], ["fibre"]);
+simulated_sinogram, normalised_projections, raw_projections_in_keV = Simulation.simulateSinogram([sigma_core, sigma_fibre, sigma_matrix], [k_core, k_fibre, k_matrix], ["core", "fibre", "matrix"]);
 
 # Store the corresponding results on the disk
 ZNCC_CT, CT_slice_from_simulated_sinogram = Simulation.reconstructAndStoreResults(simulated_sinogram, output_directory + "/laplacian1");
-print("Laplacian1_fibre params:", sigma_fibre, k_fibre, Simulation.fibre_radius);
-print("Laplacian1_fibre CT ZNCC:", ZNCC_CT);
+print("Laplacian1 params:", sigma_core, sigma_fibre, sigma_matrix, k_core, k_fibre, k_matrix, Simulation.fibre_radius);
+print("Laplacian1 CT ZNCC:", ZNCC_CT);
 
 pixel_range = np.linspace(-Simulation.value_range, Simulation.value_range, num=int(Simulation.num_samples), endpoint=True);
-laplacian_kernel_fibre = k_fibre * Simulation.laplacian(pixel_range, sigma_fibre);
+
+laplacian_kernel = k_core * Simulation.laplacian(pixel_range, sigma_core);
+np.savetxt(output_directory + "/laplacian_kernel_core.dat", laplacian_kernel_core);
+
+laplacian_kernel = k_fibre * Simulation.laplacian(pixel_range, sigma_fibre);
 np.savetxt(output_directory + "/laplacian_kernel_fibre.dat", laplacian_kernel_fibre);
+
+laplacian_kernel = k_matrix * Simulation.laplacian(pixel_range, sigma_matrix);
+np.savetxt(output_directory + "/laplacian_kernel_matrix.dat", laplacian_kernel_matrix);
 
 #
 #
