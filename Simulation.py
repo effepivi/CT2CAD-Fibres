@@ -357,10 +357,10 @@ def flatFieldCorrection(raw_projections_in_keV):
 
 def laplacian(x, sigma):
     """This function create a Laplacian kernel with
-    $$ \frac{x^2 - \sigma^2}{\sigma^4} \times e^{-\frac{x^2}{2 \sigma^2}} $$
-    See equation (50) in http://fourier.eng.hmc.edu/e161/lectures/gradient/node8.html
+
+    $$ g''(x) = \left(\frac{x^2}{\sigma^4} - \frac{1}{\sigma^2}\right) \exp\left(-\frac{x^2}{2\sigma^2}\right) $$
     """
-    kernel = 1. / math.sqrt(2. * math.pi * math.pow(sigma, 2)) * (np.power(x, 2.) - math.pow(sigma, 2)) / math.pow(sigma, 4) * np.exp(-np.power(x, 2) / (2 * math.pow(sigma, 2)))
+    kernel = (np.power(x, 2.) / math.pow(sigma, 4) - 1. / math.pow(sigma, 2)) * np.exp(-np.power(x, 2.) / (2. * math.pow(sigma, 2)));
 
     # Make sure the sum of all the kernel elements is NULL
     index_positive = kernel > 0.0;
@@ -368,7 +368,8 @@ def laplacian(x, sigma):
     sum_positive = kernel[index_positive].sum();
     sum_negative = kernel[index_negative].sum();
 
-    kernel[index_negative] = -kernel[index_negative] / sum_negative * sum_positive;
+    #kernel[index_negative] = -kernel[index_negative] / sum_negative * sum_positive;
+    # kernel[index_positive] = -kernel[index_positive] / sum_positive * sum_negative;
 
     return kernel;
 
@@ -391,8 +392,10 @@ def getLBuffer(object):
     # Return as a numpy array
     return np.array(L_buffer);
 
+temp_count=0;
 def simulateSinogram(sigma_set = None, k_set = None, name_set = None):
 
+    global temp_count;
 
     # Do not simulate the phase contrast using a Laplacian
     if isinstance(sigma_set, NoneType) or isinstance(k_set, NoneType) or isinstance(name_set, NoneType):
@@ -415,66 +418,46 @@ def simulateSinogram(sigma_set = None, k_set = None, name_set = None):
             # Get its L-buffer
             L_buffer_set[label] = getLBuffer(label);
 
-        for label, sigma in zip(name_set, sigma_set):
-            # Get its Laplacian
-            laplacian_kernels[label] = laplacian(pixel_range, sigma);
-
-        # For each energy in the beam spectrum
-        attenuation = {};
-        attenuation_fibre = {};
-        projection_per_energy_channel = {};
-        phase_contrast_image = {};
-
-        # Create a blank image
+        # Create blank images
         raw_projections_in_keV = np.zeros(L_buffer_set["fibre"].shape);
+        phase_contrast_image = np.zeros(L_buffer_set["fibre"].shape);
 
-        # phase_contrast_image_min = sys.float_info.max;
-        # phase_contrast_image_max = -sys.float_info.max;
+        for label, k, sigma in zip(name_set, k_set, sigma_set):
+            laplacian_kernels[label] = k * laplacian(pixel_range, sigma);
+            # np.savetxt(output_directory + "/laplacian_" + str(temp_count) + ".dat", laplacian_kernels[label]);
+
+            # print(L_buffer_set[label].shape)
+            # print(phase_contrast_image.shape)
+            # print(laplacian_kernels[label].shape)
+            for z in range(phase_contrast_image.shape[0]):
+                for y in range(phase_contrast_image.shape[1]):
+                    phase_contrast_image[z][y] += np.convolve((L_buffer_set[label])[z][y], laplacian_kernels[label], mode='same');
+
 
         for energy, photon_count in zip(gvxr.getEnergyBins("keV"), gvxr.getPhotonCountEnergyBins()):
 
             # Create a blank image
-            attenuation[energy] = np.zeros(L_buffer_set["fibre"].shape);
-            phase_contrast_image[energy] = {};
+            attenuation = np.zeros(L_buffer_set["fibre"].shape);
 
             # Look at all the children of the root node
             #for label in ["core", "fibre", "matrix"]:
-            for label_object in ["core", "fibre", "matrix"]:
+            for label in ["core", "fibre", "matrix"]:
                 # Get mu for this object for this energy
-                mu = gvxr.getLinearAttenuationCoefficient(label_object, energy, "keV");
+                mu = gvxr.getLinearAttenuationCoefficient(label, energy, "keV");
 
-                # Compute mu * x
-                temp = L_buffer_set[label_object] * mu;
-                attenuation[energy] += temp;
-
-                phase_contrast_image[energy][label_object] = [];
-
-                for label_laplacian, sigma in zip(name_set, sigma_set):
-                    if label_object == label_laplacian:
-                        for y in range(attenuation[energy].shape[1]):
-                            for x in range(attenuation[energy].shape[0]):
-                                phase_contrast_image[energy][label_laplacian].append(np.convolve(temp[x][y], laplacian_kernels[label_laplacian], mode='same'));
-
-                        phase_contrast_image[energy][label_laplacian] = np.array(phase_contrast_image[energy][label_laplacian]);
-                        phase_contrast_image[energy][label_laplacian].shape = L_buffer_set[label_object].shape;
-
-                # phase_contrast_image_min = min(phase_contrast_image_min, np.min(phase_contrast_image[energy][label]));
-                # phase_contrast_image_max = max(phase_contrast_image_min, np.max(phase_contrast_image[energy][label]));
+                # Compute sum mu * x
+                attenuation += L_buffer_set[label] * mu;
 
             # Store the projection for this energy channel
-            projection_per_energy_channel[energy] = energy * photon_count * np.exp(-attenuation[energy]);
+            raw_projections_in_keV += energy * photon_count * np.exp(-attenuation);
 
-        # Create the raw projections
-        raw_projections_in_keV = np.zeros(L_buffer_set["fibre"].shape);
+        # Apply the phase contrastt
+        raw_projections_in_keV -= phase_contrast_image;
 
-        for energy in gvxr.getEnergyBins("keV"):
-            raw_projections_in_keV += projection_per_energy_channel[energy];
-            for label, k in zip(name_set, k_set):
-                # Normalise it
-                #phase_contrast_image[energy][label] /= max(phase_contrast_image_max, abs(phase_contrast_image_min));
-
-                if label == "fibre":
-                    raw_projections_in_keV -= k * phase_contrast_image[energy][label];
+        phase_contrast_image.shape = [900, 1024];
+        volume = sitk.GetImageFromArray(phase_contrast_image);
+        # volume.SetSpacing([pixel_spacing_in_mm, pixel_spacing_in_mm, pixel_spacing_in_mm]);
+        sitk.WriteImage(volume, output_directory + "/phase_contrast_image.mha", useCompression=True);
 
     # Apply the LSF line by line
     for z in range(raw_projections_in_keV.shape[0]):
@@ -676,6 +659,9 @@ def fitnessFunctionFibres(x):
 
     return fitness;
 
+best_fitness = sys.float_info.max;
+laplacian_id = 0;
+
 def fitnessFunctionLaplacian(x):
     global best_fitness;
     global laplacian_id;
@@ -702,13 +688,13 @@ def fitnessFunctionLaplacian(x):
     MAE_sinogram = np.mean(np.abs(normalised_simulated_sinogram.flatten() - normalised_reference_sinogram.flatten()));
     ZNCC_sinogram = np.mean(np.multiply(normalised_simulated_sinogram.flatten(), normalised_reference_sinogram.flatten()));
 
-    # Reconstruct the corresponding CT slice
-    simulated_sinogram.shape = (simulated_sinogram.size // simulated_sinogram.shape[2], simulated_sinogram.shape[2]);
-    CT_laplacian = iradon(simulated_sinogram.T, theta=theta, circle=True);
-    normalised_CT_laplacian = (CT_laplacian - CT_laplacian.mean()) / CT_laplacian.std();
-
-    reference_image = copy.deepcopy(reference_CT[cylinder_position_in_centre_of_slice[1] - roi_length:cylinder_position_in_centre_of_slice[1] + roi_length, cylinder_position_in_centre_of_slice[0] - roi_length:cylinder_position_in_centre_of_slice[0] + roi_length]);
-    test_image = copy.deepcopy(CT_laplacian[cylinder_position_in_centre_of_slice[1] - roi_length:cylinder_position_in_centre_of_slice[1] + roi_length, cylinder_position_in_centre_of_slice[0] - roi_length:cylinder_position_in_centre_of_slice[0] + roi_length]);
+    # # Reconstruct the corresponding CT slice
+    # simulated_sinogram.shape = (simulated_sinogram.size // simulated_sinogram.shape[2], simulated_sinogram.shape[2]);
+    # CT_laplacian = iradon(simulated_sinogram.T, theta=theta, circle=True);
+    # normalised_CT_laplacian = (CT_laplacian - CT_laplacian.mean()) / CT_laplacian.std();
+    #
+    # reference_image = copy.deepcopy(normalised_reference_CT[cylinder_position_in_centre_of_slice[1] - roi_length:cylinder_position_in_centre_of_slice[1] + roi_length, cylinder_position_in_centre_of_slice[0] - roi_length:cylinder_position_in_centre_of_slice[0] + roi_length]);
+    # test_image = copy.deepcopy(normalised_CT_laplacian[cylinder_position_in_centre_of_slice[1] - roi_length:cylinder_position_in_centre_of_slice[1] + roi_length, cylinder_position_in_centre_of_slice[0] - roi_length:cylinder_position_in_centre_of_slice[0] + roi_length]);
 
     # MAE_sinogram = np.mean(np.abs(np.subtract(reference_sinogram.flatten(), simulated_sinogram.flatten())));
 
@@ -743,8 +729,8 @@ def fitnessFunctionLaplacian(x):
     # normalised_simulated_CT = (reconstruction_CT_laplacian - reconstruction_CT_laplacian.mean()) / reconstruction_CT_laplacian.std();
     # temp_reference_CT = (reference_CT - reference_CT.mean()) / reference_CT.std();
     #
-    MAE_CT = np.mean(np.abs(np.subtract(reference_CT.flatten(), CT_laplacian.flatten())));
-    ZNCC_CT = np.mean(np.multiply(normalised_reference_CT.flatten(), normalised_CT_laplacian.flatten()));
+    # MAE_CT = np.mean(np.abs(np.subtract(reference_CT.flatten(), CT_laplacian.flatten())));
+    # ZNCC_CT = np.mean(np.multiply(normalised_reference_CT.flatten(), normalised_CT_laplacian.flatten()));
     # SSIM_CT = ssim(normalised_simulated_CT, temp_reference_CT, data_range=temp_reference_CT.max() - temp_reference_CT.min())
     #
     #
@@ -762,56 +748,62 @@ def fitnessFunctionLaplacian(x):
     #
 
 
-    MAE_fibre = np.mean(np.abs(np.subtract(reference_image.flatten(), test_image.flatten())));
+    # MAE_fibre = np.mean(np.abs(np.subtract(reference_image.flatten(), test_image.flatten())));
 
 
     # SSIM_fibre = ssim(reference_image, test_image, data_range=reference_image.max() - reference_image.min())
 
     fitness = MAE_sinogram;
-    fitness = MAE_fibre;
-    fitness = MAE_CT;
+    # fitness = MAE_fibre;
+    # fitness = MAE_CT;
     #fitness = 1 / (ZNCC_CT + 1);
 
-    # if best_fitness > fitness:
-    #     best_fitness = fitness;
-    #
-    #
-    #     volume = sitk.GetImageFromArray(CT_laplacian);
-    #     volume.SetSpacing([pixel_spacing_in_mm, pixel_spacing_in_mm, pixel_spacing_in_mm]);
-    #     sitk.WriteImage(volume, output_directory + "/reconstruction_CT_laplacian_" + str(laplacian_id) + ".mha", useCompression=True);
-    #
-    #     volume = sitk.GetImageFromArray(CT_laplacian[cylinder_position_in_centre_of_slice[1] - roi_length:cylinder_position_in_centre_of_slice[1] + roi_length,
-    #                                     cylinder_position_in_centre_of_slice[0] - roi_length:cylinder_position_in_centre_of_slice[0] + roi_length]);
-    #     volume.SetSpacing([pixel_spacing_in_mm, pixel_spacing_in_mm, pixel_spacing_in_mm]);
-    #     sitk.WriteImage(volume, output_directory + "/reconstruction_CT_laplacian_fibre_centre_" + str(laplacian_id) + ".mha", useCompression=True);
-    #
-    #     comp_equalized = compare_images(reference_image, test_image, method='checkerboard');
-    #     volume = sitk.GetImageFromArray(comp_equalized)
-    #     sitk.WriteImage(volume, output_directory + "/laplacian_comp_fibre_" + str(laplacian_id) + ".mha", useCompression=True);
-    #
-    #     comp_equalized -= np.min(comp_equalized);
-    #     comp_equalized /= np.max(comp_equalized);
-    #     comp_equalized *= 255;
-    #     comp_equalized = np.array(comp_equalized, dtype=np.uint8);
-    #     io.imsave(output_directory + "/laplacian_comp_fibre_" + str(laplacian_id) + ".png", comp_equalized);
-    #
-    #     comp_equalized = compare_images(reference_CT, CT_laplacian, method='checkerboard');
-    #     volume = sitk.GetImageFromArray(comp_equalized)
-    #     sitk.WriteImage(volume, output_directory + "/laplacian_comp_slice_" + str(laplacian_id) + ".mha", useCompression=True);
-    #
-    #     comp_equalized -= np.min(comp_equalized);
-    #     comp_equalized /= np.max(comp_equalized);
-    #     comp_equalized *= 255;
-    #     comp_equalized = np.array(comp_equalized, dtype=np.uint8);
-    #     io.imsave(output_directory + "/laplacian_comp_slice_" + str(laplacian_id) + ".png", comp_equalized);
-    #
-    #     laplacian_id += 1;
+    if best_fitness > fitness:
+        best_fitness = fitness;
+
+        simulated_sinogram.shape = (simulated_sinogram.size // simulated_sinogram.shape[2], simulated_sinogram.shape[2]);
+        CT_laplacian = iradon(simulated_sinogram.T, theta=theta, circle=True);
+        normalised_CT_laplacian = (CT_laplacian - CT_laplacian.mean()) / CT_laplacian.std();
+
+        reference_image = copy.deepcopy(reference_CT[cylinder_position_in_centre_of_slice[1] - roi_length:cylinder_position_in_centre_of_slice[1] + roi_length, cylinder_position_in_centre_of_slice[0] - roi_length:cylinder_position_in_centre_of_slice[0] + roi_length]);
+        test_image = copy.deepcopy(CT_laplacian[cylinder_position_in_centre_of_slice[1] - roi_length:cylinder_position_in_centre_of_slice[1] + roi_length, cylinder_position_in_centre_of_slice[0] - roi_length:cylinder_position_in_centre_of_slice[0] + roi_length]);
+
+        volume = sitk.GetImageFromArray(CT_laplacian);
+        volume.SetSpacing([pixel_spacing_in_mm, pixel_spacing_in_mm, pixel_spacing_in_mm]);
+        sitk.WriteImage(volume, output_directory + "/reconstruction_CT_laplacian_" + str(laplacian_id) + ".mha", useCompression=True);
+
+        volume = sitk.GetImageFromArray(CT_laplacian[cylinder_position_in_centre_of_slice[1] - roi_length:cylinder_position_in_centre_of_slice[1] + roi_length,
+                                        cylinder_position_in_centre_of_slice[0] - roi_length:cylinder_position_in_centre_of_slice[0] + roi_length]);
+        volume.SetSpacing([pixel_spacing_in_mm, pixel_spacing_in_mm, pixel_spacing_in_mm]);
+        sitk.WriteImage(volume, output_directory + "/reconstruction_CT_laplacian_fibre_centre_" + str(laplacian_id) + ".mha", useCompression=True);
+
+        comp_equalized = compare_images(reference_image, test_image, method='checkerboard');
+        volume = sitk.GetImageFromArray(comp_equalized)
+        sitk.WriteImage(volume, output_directory + "/laplacian_comp_fibre_" + str(laplacian_id) + ".mha", useCompression=True);
+
+        comp_equalized -= np.min(comp_equalized);
+        comp_equalized /= np.max(comp_equalized);
+        comp_equalized *= 255;
+        comp_equalized = np.array(comp_equalized, dtype=np.uint8);
+        io.imsave(output_directory + "/laplacian_comp_fibre_" + str(laplacian_id) + ".png", comp_equalized);
+
+        comp_equalized = compare_images(reference_CT, CT_laplacian, method='checkerboard');
+        volume = sitk.GetImageFromArray(comp_equalized)
+        sitk.WriteImage(volume, output_directory + "/laplacian_comp_slice_" + str(laplacian_id) + ".mha", useCompression=True);
+
+        comp_equalized -= np.min(comp_equalized);
+        comp_equalized /= np.max(comp_equalized);
+        comp_equalized *= 255;
+        comp_equalized = np.array(comp_equalized, dtype=np.uint8);
+        io.imsave(output_directory + "/laplacian_comp_slice_" + str(laplacian_id) + ".png", comp_equalized);
+
+        laplacian_id += 1;
 
 
-    reference_image = (reference_image - reference_image.mean()) / reference_image.std();
-    test_image = (test_image - test_image.mean()) / test_image.std();
-    ZNCC_fibre = np.mean(np.multiply(reference_image.flatten(), test_image.flatten()));
-    print("IND", x[0], x[1], x[2], MAE_sinogram, ZNCC_sinogram, MAE_CT, ZNCC_CT, MAE_fibre, ZNCC_fibre);
+    # reference_image = (reference_image - reference_image.mean()) / reference_image.std();
+    # test_image = (test_image - test_image.mean()) / test_image.std();
+    # ZNCC_fibre = np.mean(np.multiply(reference_image.flatten(), test_image.flatten()));
+    print("IND", x[0], x[1], x[2], fitness, ZNCC_sinogram);
 
     return fitness;
 

@@ -8,12 +8,15 @@ import copy, math, os, glob, sys
 
 import numpy as np
 
+from skimage.transform import iradon
+
 import matplotlib
-matplotlib.use('AGG')   # generate postscript output by default
+matplotlib.use('TkAGG')   # generate postscript output by default
 
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 from matplotlib import cm
+from matplotlib.widgets import Slider, Button, RadioButtons
 
 from scipy import ndimage
 
@@ -40,11 +43,31 @@ def processCmdLine():
     parser.add_argument('--output', help='Output dir', nargs=1, type=str, required=True);
     return parser.parse_args()
 
+
+
+
+DEBUG_FLAG=True;
+
 args = processCmdLine();
 
 output_directory = args.output[0];
 if not os.path.exists(output_directory):
     os.makedirs(output_directory);
+
+Simulation.output_directory = output_directory;
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # ## Load the image data
@@ -65,6 +88,188 @@ print("RECONSTRUCTION:", elapsed_time);
 
 # Set the X-ray simulation environment
 Simulation.initGVXR();
+
+
+
+
+
+
+sigma_core = 0.15;
+sigma_fibre = 1.5;
+sigma_matrix = 0.2;
+
+k_core = 5;
+k_fibre = 1;
+k_matrix = 2.0;
+
+
+x = np.linspace(-Simulation.value_range, Simulation.value_range, num=int(Simulation.num_samples), endpoint=True)
+laplacian_kernel = Simulation.laplacian(x, sigma_fibre);
+
+print(np.sum(laplacian_kernel));
+
+fig, ax = plt.subplots()
+plt.subplots_adjust(left=0.25, bottom=0.25)
+l, = plt.plot(x, laplacian_kernel * k_fibre, lw=2);
+
+axcolor = 'lightgoldenrodyellow'
+axfreq = plt.axes([0.25, 0.1, 0.65, 0.03], facecolor=axcolor)
+axamp = plt.axes([0.25, 0.15, 0.65, 0.03], facecolor=axcolor)
+
+delta_f = 0.05
+sfreq = Slider(axfreq, 'Sigma', 0.0001, 3.5, valinit=sigma_fibre, valstep=delta_f)
+samp = Slider(axamp, 'k', 0.0, 5000.0, valinit=k_fibre)
+
+resetax = plt.axes([0.8, 0.025, 0.1, 0.04])
+button = Button(resetax, 'Apply', color=axcolor, hovercolor='0.975')
+
+
+
+
+fibre_L_buffer  = sitk.GetArrayFromImage(sitk.ReadImage(output_directory + "/l_buffer_fibre.mha"));
+core_L_buffer   = sitk.GetArrayFromImage(sitk.ReadImage(output_directory + "/l_buffer_core.mha"));
+matrix_L_buffer = sitk.GetArrayFromImage(sitk.ReadImage(output_directory + "/l_buffer_matrix.mha"));
+
+
+def simulateAndReconstruct():
+    global sigma_fibre, k_fibre, samp, sfreq, laplacian_kernel, x;
+    global fibre_L_buffer, core_L_buffer, matrix_L_buffer;
+
+    k_fibre = samp.val
+    sigma_fibre = sfreq.val
+    laplacian_kernel = Simulation.laplacian(x, sigma_fibre);
+
+    projection = np.zeros(fibre_L_buffer.shape);
+    phase_contrast_image = np.zeros(fibre_L_buffer.shape);
+
+    total_energy = 0.0;
+
+    attenuation =  core_L_buffer * 348.9097883430308 + matrix_L_buffer * 16.53631368289138;
+    projection = 32.999999821186066 * 0.9700000286102295 * np.exp(-attenuation);
+
+    attenuation =  core_L_buffer * 56.46307119094464 + matrix_L_buffer * 2.708343134657077;
+    projection += 65.99999964237213 * 0.019999999552965164 * np.exp(-attenuation);
+    #
+    attenuation =  core_L_buffer * 87.90873756872163 + matrix_L_buffer * 1.2023011012123404;
+    projection += 98.9999994635582 * 0.009999999776482582 * np.exp(-attenuation);
+
+
+    for y in range(fibre_L_buffer.shape[0]):
+        phase_contrast_image[y] += np.convolve((fibre_L_buffer)[y], laplacian_kernel, mode='same');
+        # phase_contrast_image[y] += np.convolve((core_L_buffer)[y], laplacian_kernel, mode='same');
+        # phase_contrast_image[y] += np.convolve((matrix_L_buffer)[y], laplacian_kernel, mode='same');
+
+    phase_contrast_image *= k_fibre;
+
+    volume = sitk.GetImageFromArray(phase_contrast_image);
+    # volume.SetSpacing([pixel_spacing_in_mm, pixel_spacing_in_mm, pixel_spacing_in_mm]);
+    sitk.WriteImage(volume, output_directory + "/phase_contrast_image.mha", useCompression=True);
+
+
+    projection -= phase_contrast_image;
+
+    projection /= 32.999999821186066 * 0.9700000286102295 #+ 65.99999964237213 * 0.019999999552965164 + 98.9999994635582 * 0.009999999776482582;
+
+    threshold = 1e-6
+    projection[projection < threshold] = threshold;
+
+    simulated_sinogram = -np.log(projection);
+    simulated_sinogram /= Simulation.pixel_spacing_in_micrometre * gvxr.getUnitOfLength("um") / gvxr.getUnitOfLength("cm");
+
+
+
+    volume = sitk.GetImageFromArray(simulated_sinogram);
+    sitk.WriteImage(volume, output_directory + "/sinogram_with_laplacian.mha", useCompression=True);
+
+    CT_laplacian = iradon(simulated_sinogram.T, theta=Simulation.theta, circle=True);
+
+    volume = sitk.GetImageFromArray(CT_laplacian);
+    # volume.SetSpacing([pixel_spacing_in_mm, pixel_spacing_in_mm, pixel_spacing_in_mm]);
+    sitk.WriteImage(volume, output_directory + "/CT_with_laplacian.mha", useCompression=True);
+
+    return CT_laplacian;
+
+
+CT_laplacian = simulateAndReconstruct();
+fig2, ax2 = plt.subplots()
+fig_img = plt.imshow(CT_laplacian)
+fig_img.set_cmap('gray')
+
+
+def update(val):
+    global sigma_fibre, k_fibre, x, laplacian_kernel;
+
+    k_fibre = samp.val
+    sigma_fibre = sfreq.val
+    laplacian_kernel = Simulation.laplacian(x, sigma_fibre);
+
+    l.set_ydata(laplacian_kernel * k_fibre)
+    ax.set_ylim(np.min(laplacian_kernel * k_fibre), np.max(laplacian_kernel * k_fibre))
+
+    fig.canvas.draw_idle()
+
+
+sfreq.on_changed(update)
+samp.on_changed(update)
+
+
+
+def reset(event):
+
+    global sigma_fibre, k_fibre;
+
+    fig_img.set_data(simulateAndReconstruct());
+    fig2.canvas.draw_idle()
+
+
+
+
+
+
+button.on_clicked(reset)
+
+
+
+# plt.show()
+
+#
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 ################################################################################
@@ -102,13 +307,14 @@ else:
 # Apply the result of the registration
 Simulation.setMatrix(Simulation.matrix_geometry_parameters);
 
-# Simulate the corresponding CT aquisition
-simulated_sinogram, normalised_projections, raw_projections_in_keV = Simulation.simulateSinogram();
+if not DEBUG_FLAG:
+    # Simulate the corresponding CT aquisition
+    simulated_sinogram, normalised_projections, raw_projections_in_keV = Simulation.simulateSinogram();
 
-# Store the corresponding results on the disk
-ZNCC_CT, CT_slice_from_simulated_sinogram = Simulation.reconstructAndStoreResults(simulated_sinogram, output_directory + "/matrix1");
-print("Matrix1 params:", Simulation.matrix_geometry_parameters);
-print("Matrix1 CT ZNCC:", ZNCC_CT);
+    # Store the corresponding results on the disk
+    ZNCC_CT, CT_slice_from_simulated_sinogram = Simulation.reconstructAndStoreResults(simulated_sinogram, output_directory + "/matrix1");
+    print("Matrix1 params:", Simulation.matrix_geometry_parameters);
+    print("Matrix1 CT ZNCC:", ZNCC_CT);
 
 
 ################################################################################
@@ -158,13 +364,14 @@ else:
 Simulation.setMatrix(Simulation.matrix_geometry_parameters);
 Simulation.setFibres(Simulation.centroid_set);
 
-# Simulate the corresponding CT aquisition
-simulated_sinogram, normalised_projections, raw_projections_in_keV = Simulation.simulateSinogram();
+if not DEBUG_FLAG:
+    # Simulate the corresponding CT aquisition
+    simulated_sinogram, normalised_projections, raw_projections_in_keV = Simulation.simulateSinogram();
 
-# Store the corresponding results on the disk
-ZNCC_CT, CT_slice_from_simulated_sinogram = Simulation.reconstructAndStoreResults(simulated_sinogram, output_directory + "/fibres1");
-print("Fibres1 params:", Simulation.core_radius, Simulation.fibre_radius);
-print("Fibres1 CT ZNCC:", ZNCC_CT);
+    # Store the corresponding results on the disk
+    ZNCC_CT, CT_slice_from_simulated_sinogram = Simulation.reconstructAndStoreResults(simulated_sinogram, output_directory + "/fibres1");
+    print("Fibres1 params:", Simulation.core_radius, Simulation.fibre_radius);
+    print("Fibres1 CT ZNCC:", ZNCC_CT);
 
 
 ################################################################################
@@ -207,7 +414,7 @@ simulated_sinogram, normalised_projections, raw_projections_in_keV = Simulation.
 
 # Store the corresponding results on the disk
 ZNCC_CT, CT_slice_from_simulated_sinogram = Simulation.reconstructAndStoreResults(simulated_sinogram, output_directory + "/matrix2");
-print("matrix2 params:", Simulation.core_radius, Simulation.fibre_radius);
+print("matrix2 params:", Simulation.matrix_geometry_parameters);
 print("matrix2 CT ZNCC:", ZNCC_CT);
 
 
@@ -224,12 +431,13 @@ Simulation.findFibreInCentreOfCtSlice();
 Simulation.setMatrix(Simulation.matrix_geometry_parameters);
 Simulation.setFibres(Simulation.centroid_set);
 
-# Simulate the corresponding CT aquisition
-simulated_sinogram, normalised_projections, raw_projections_in_keV = Simulation.simulateSinogram();
+if not DEBUG_FLAG:
+    # Simulate the corresponding CT aquisition
+    simulated_sinogram, normalised_projections, raw_projections_in_keV = Simulation.simulateSinogram();
 
-# Store the corresponding results on the disk
-ZNCC_CT, CT_slice_from_simulated_sinogram = Simulation.reconstructAndStoreResults(simulated_sinogram, output_directory + "/fibres2");
-print("Fibres2 CT ZNCC:", ZNCC_CT);
+    # Store the corresponding results on the disk
+    ZNCC_CT, CT_slice_from_simulated_sinogram = Simulation.reconstructAndStoreResults(simulated_sinogram, output_directory + "/fibres2");
+    print("Fibres2 CT ZNCC:", ZNCC_CT);
 
 
 ################################################################################
@@ -261,7 +469,7 @@ else:
     es = cma.CMAEvolutionStrategy(x0, 0.25, opts);
     es.optimize(Simulation.fitnessFunctionFibres);
     elapsed_time = time.time() - start_time
-    print("FIBRES2",elapsed_time);
+    print("FIBRES3",elapsed_time);
     Simulation.fibre_radius = es.result.xbest[0];
     core_radius = Simulation.fibre_radius * es.result.xbest[1];
 
@@ -271,13 +479,22 @@ else:
 Simulation.setMatrix(Simulation.matrix_geometry_parameters);
 Simulation.setFibres(Simulation.centroid_set);
 
-# Simulate the corresponding CT aquisition
-simulated_sinogram, normalised_projections, raw_projections_in_keV = Simulation.simulateSinogram();
+if not DEBUG_FLAG:
+    # Simulate the corresponding CT aquisition
+    simulated_sinogram, normalised_projections, raw_projections_in_keV = Simulation.simulateSinogram();
 
-# Store the corresponding results on the disk
-ZNCC_CT, CT_slice_from_simulated_sinogram = Simulation.reconstructAndStoreResults(simulated_sinogram, output_directory + "/fibres3");
-print("Fibres3 params:", Simulation.core_radius, Simulation.fibre_radius);
-print("Fibres3 CT ZNCC:", ZNCC_CT);
+    # Store the corresponding results on the disk
+    ZNCC_CT, CT_slice_from_simulated_sinogram = Simulation.reconstructAndStoreResults(simulated_sinogram, output_directory + "/fibres3");
+    print("Fibres3 params:", Simulation.core_radius, Simulation.fibre_radius);
+    print("Fibres3 CT ZNCC:", ZNCC_CT);
+
+
+
+
+
+
+
+
 
 
 
@@ -290,33 +507,33 @@ print("Fibres3 CT ZNCC:", ZNCC_CT);
 # The registration has already been performed. Load the results.
 if os.path.isfile(output_directory + "/laplacian1.dat"):
     temp = np.loadtxt(output_directory + "/laplacian1.dat");
-    sigma_core = temp[0];
-    k_core = temp[1];
+    sigma_fibre = temp[0];
+    k_fibre = temp[1];
     Simulation.fibre_radius = temp[2];
 # Perform the registration using CMA-ES
 else:
 
     sigma_core = 0.15;
-    sigma_fibre = 0.35;
+    sigma_fibre = 1.5;
     sigma_matrix = 0.2;
 
     k_core = 5;
-    k_fibre = 3;
+    k_fibre = 100;
     k_matrix = 2.0;
 
     x0 = [sigma_fibre, k_fibre, Simulation.fibre_radius];
-    bounds = [[0.005, 0.05, 0.95 * Simulation.fibre_radius], [0.6, 15, 1.05 * Simulation.fibre_radius]];
+    bounds = [[0.005, 0.0, 0.95 * Simulation.fibre_radius], [2.5, 150, 1.15 * Simulation.fibre_radius]];
 
     best_fitness = sys.float_info.max;
     laplacian_id = 0;
 
     opts = cma.CMAOptions()
-    opts.set('tolfun', 1e-3);
-    opts['tolx'] = 1e-3;
+    opts.set('tolfun', 1e-6);
+    opts['tolx'] = 1e-6;
     opts['bounds'] = bounds;
     #opts['seed'] = 987654321;
     # opts['maxiter'] = 5;
-    opts['CMA_stds'] = [0.25, 0.25, Simulation.fibre_radius * 0.025];
+    opts['CMA_stds'] = [0.25, 10.25, Simulation.fibre_radius * 0.1];
 
 
     es = cma.CMAEvolutionStrategy(x0, 0.25, opts);
@@ -328,7 +545,7 @@ else:
     k_fibre = es.result.xbest[1];
     Simulation.fibre_radius = es.result.xbest[2];
 
-    np.savetxt(output_directory + "/laplacian1.dat", [sigma_fibre, k_fibre,Simulation.fibre_radius], header='sigma_fibre,k_fibre,fibre_radius_in_um');
+    np.savetxt(output_directory + "/laplacian1.dat", [sigma_fibre, k_fibre, Simulation.fibre_radius], header='sigma_fibre,k_fibre,fibre_radius_in_um');
 
 # Apply the result of the registration
 Simulation.setMatrix(Simulation.matrix_geometry_parameters);
@@ -339,8 +556,12 @@ simulated_sinogram, normalised_projections, raw_projections_in_keV = Simulation.
 
 # Store the corresponding results on the disk
 ZNCC_CT, CT_slice_from_simulated_sinogram = Simulation.reconstructAndStoreResults(simulated_sinogram, output_directory + "/laplacian1");
-print("Laplacian1_fibre params:", Simulation.core_radius, Simulation.fibre_radius);
+print("Laplacian1_fibre params:", sigma_fibre, k_fibre, Simulation.fibre_radius);
 print("Laplacian1_fibre CT ZNCC:", ZNCC_CT);
+
+pixel_range = np.linspace(-Simulation.value_range, Simulation.value_range, num=int(Simulation.num_samples), endpoint=True);
+laplacian_kernel_fibre = k_fibre * Simulation.laplacian(pixel_range, sigma_fibre);
+np.savetxt(output_directory + "/laplacian_kernel_fibre.dat", laplacian_kernel_fibre);
 
 #
 #
