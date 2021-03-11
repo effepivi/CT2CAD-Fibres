@@ -517,17 +517,17 @@ if os.path.isfile(output_directory + "/laplacian1.dat"):
 # Perform the registration using CMA-ES
 else:
 
-    sigma_core = 1.5;
-    sigma_fibre = 0.9;
-    sigma_matrix = 0.35;
+    sigma_core = 2;
+    sigma_fibre = 0.75;
+    sigma_matrix = 0.5;
 
     k_core = 1;
-    k_fibre = 150;
-    k_matrix = 20.0;
+    k_fibre = 250;
+    k_matrix = 40.0;
 
     x0 = [sigma_core, k_core, sigma_fibre, k_fibre, sigma_matrix, k_matrix, Simulation.fibre_radius];
     bounds = [[0.005, 0.0, 0.005, 0.0, 0.005, 0.0, 0.95 * Simulation.fibre_radius],
-              [2.5, 250, 2.5, 250, 2.5, 250, 1.15 * Simulation.fibre_radius]];
+              [2.5, 250, 2.5, 1000, 2.5, 1000, 1.15 * Simulation.fibre_radius]];
 
     best_fitness = sys.float_info.max;
     laplacian_id = 0;
@@ -540,7 +540,9 @@ else:
     # opts['maxiter'] = 5;
     opts['CMA_stds'] = [0.25, 20.25, 0.25, 20.25, 0.25, 20.25, Simulation.fibre_radius * 0.1];
 
-    #IND 1.1483786225961983 0.009613492090135059 0.907846577836233 149.9477015375008 0.3522269950392328 1.5680210949532862 53.342509992423125 0.08529454365982699 0.9926270765693282
+
+    #IND 2.19746627320312	1.16136683253601	0.763740221230013	249.875214879601	0.503314643902767	38.2390121454358	53.2213098006193	    0.084343959685696	0.992778341956513
+    #IND 2.07828517522359	8.86453347432242E-05	0.755930952404442	249.992034434311	0.483822894369194	23.3017161885803	53.4611294410208	0.08427650560267	0.992771013383053
 
     es = cma.CMAEvolutionStrategy(x0, 0.25, opts);
     es.optimize(Simulation.fitnessFunctionLaplacian);
