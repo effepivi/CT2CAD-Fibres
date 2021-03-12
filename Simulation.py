@@ -33,6 +33,13 @@ centroid_set = None;
 matrix_geometry_parameters = None;
 cylinder_position_in_centre_of_slice = None;
 
+a2 = 601.873;
+b2 = 54.9359;
+c2 = -3.58452;
+d2 = 0.469614;
+e2 = 6.32561e+09;
+f2 = 1.0;
+
 def createTargetFromRawSinogram(fname):
     """This function read the binary file fname. This file contains
     the projections after flat-field correction.
@@ -81,7 +88,7 @@ def initGVXR():
     # global fibre_material;
     global fibre_density;
 
-    global lsf_kernel;
+    global a2, b2, c2, d2, e2, f2, lsf_kernel;
 
     # Create an OpenGL context, here using EGL, i.e. a windowless context
     gvxr.createWindow(0, 1, "EGL");
@@ -138,8 +145,10 @@ def initGVXR():
 
     # The response of the detector as the line-spread function (LSF)
     t = np.arange(-20., 21., 1.);
-    lsf_kernel=lsf(t*41)/lsf(0);
+    lsf_kernel=lsf(t*41, a2, b2, c2, d2, e2, f2);
     lsf_kernel/=lsf_kernel.sum();
+
+
 
 
 def computeSinogramFromFlatField(normalised_projections):
@@ -811,6 +820,144 @@ def fitnessFunctionLaplacian(x):
     '''
     return MAE_sinogram;
 
+best_fitness = sys.float_info.max;
+lsf_id = 0;
+
+def fitnessFunctionLSF(x):
+    global best_fitness;
+    global lsf_id;
+
+    Simulation.a2 = x[0];
+    Simulation.b2 = x[1];
+    Simulation.c2 = x[2];
+    Simulation.d2 = x[3];
+    Simulation.e2 = x[4];
+    Simulation.f2 = x[5];
+
+    # Simulate a sinogram
+    simulated_sinogram, normalised_projections, raw_projections_in_keV = simulateSinogram([Simulation.sigma_core, Simulation.sigma_fibre, Simulation.sigma_matrix], [Simulation.k_core, Simulation.k_fibre, Simulation.k_matrix], ["core", "fibre", "matrix"]);
+    MAE_sinogram = np.mean(np.abs(np.subtract(reference_sinogram.flatten(), simulated_sinogram.flatten())));
+    '''normalised_simulated_sinogram = (simulated_sinogram - simulated_sinogram.mean()) / simulated_sinogram.std();
+    MAE_sinogram = np.mean(np.abs(normalised_simulated_sinogram.flatten() - normalised_reference_sinogram.flatten()));
+    ZNCC_sinogram = np.mean(np.multiply(normalised_simulated_sinogram.flatten(), normalised_reference_sinogram.flatten()));
+
+    # # Reconstruct the corresponding CT slice
+    # simulated_sinogram.shape = (simulated_sinogram.size // simulated_sinogram.shape[2], simulated_sinogram.shape[2]);
+    # CT_lsf = iradon(simulated_sinogram.T, theta=theta, circle=True);
+    # normalised_CT_lsf = (CT_lsf - CT_lsf.mean()) / CT_lsf.std();
+    #
+    # reference_image = copy.deepcopy(normalised_reference_CT[cylinder_position_in_centre_of_slice[1] - roi_length:cylinder_position_in_centre_of_slice[1] + roi_length, cylinder_position_in_centre_of_slice[0] - roi_length:cylinder_position_in_centre_of_slice[0] + roi_length]);
+    # test_image = copy.deepcopy(normalised_CT_lsf[cylinder_position_in_centre_of_slice[1] - roi_length:cylinder_position_in_centre_of_slice[1] + roi_length, cylinder_position_in_centre_of_slice[0] - roi_length:cylinder_position_in_centre_of_slice[0] + roi_length]);
+
+
+    #
+    # normalised_simulated_sinogram.shape = (normalised_simulated_sinogram.size // normalised_simulated_sinogram.shape[2], normalised_simulated_sinogram.shape[2]);
+    #
+    # SSIM_sinogram = ssim(normalised_simulated_sinogram, normalised_reference_sinogram, data_range=normalised_reference_sinogram.max() - normalised_reference_sinogram.min())
+
+    # Reconstruct the corresponding CT slice
+#     theta = theta / 180.0 * math.pi;
+#     rot_center = int(simulated_sinogram.shape[2]/2);
+#     reconstruction_tomopy = tomopy.recon(simulated_sinogram, theta, center=rot_center, algorithm="gridrec", sinogram_order=False);
+
+
+
+
+
+    # simulated_sinogram.shape = (simulated_sinogram.size // simulated_sinogram.shape[2], simulated_sinogram.shape[2]);
+    # CT_lsf = iradon(simulated_sinogram.T, theta=theta, circle=True);
+
+
+    # offset = min(np.min(CT_lsf), np.min(reference_CT));
+    #
+    # reconstruction_CT_lsf = CT_lsf - offset;
+    # reference_CT = reference_CT - offset;
+    # reconstruction_CT_lsf += 0.5;
+    # reference_CT += 0.5;
+    #
+    # reconstruction_CT_lsf = np.log(reconstruction_CT_lsf);
+    # reference_CT = np.log(reference_CT);
+    #
+    # normalised_simulated_CT = (reconstruction_CT_lsf - reconstruction_CT_lsf.mean()) / reconstruction_CT_lsf.std();
+    # temp_reference_CT = (reference_CT - reference_CT.mean()) / reference_CT.std();
+    #
+    # MAE_CT = np.mean(np.abs(np.subtract(reference_CT.flatten(), CT_lsf.flatten())));
+    # ZNCC_CT = np.mean(np.multiply(normalised_reference_CT.flatten(), normalised_CT_lsf.flatten()));
+    # SSIM_CT = ssim(normalised_simulated_CT, temp_reference_CT, data_range=temp_reference_CT.max() - temp_reference_CT.min())
+    #
+    #
+    #
+    # index = np.nonzero(core_mask);
+    # diff_core = math.pow(np.mean(reference_image[index]) - np.mean(test_image[index]), 2);
+    #
+    # index = np.nonzero(fibre_mask);
+    # diff_fibre = math.pow(np.mean(reference_image[index]) - np.mean(test_image[index]), 2);
+    #
+    # index = np.nonzero(matrix_mask);
+    # diff_matrix = math.pow(np.mean(reference_image[index]) - np.mean(test_image[index]), 2);
+    #
+    #
+    #
+
+
+    # MAE_fibre = np.mean(np.abs(np.subtract(reference_image.flatten(), test_image.flatten())));
+
+
+    # SSIM_fibre = ssim(reference_image, test_image, data_range=reference_image.max() - reference_image.min())
+    '''
+    fitness = MAE_sinogram;
+    # fitness = MAE_fibre;
+    # fitness = MAE_CT;
+    #fitness = 1 / (ZNCC_CT + 1);
+
+    if best_fitness > fitness:
+        best_fitness = fitness;
+
+        simulated_sinogram.shape = (simulated_sinogram.size // simulated_sinogram.shape[2], simulated_sinogram.shape[2]);
+        CT_lsf = iradon(simulated_sinogram.T, theta=theta, circle=True);
+        normalised_CT_lsf = (CT_lsf - CT_lsf.mean()) / CT_lsf.std();
+
+        reference_image = copy.deepcopy(reference_CT[cylinder_position_in_centre_of_slice[1] - roi_length:cylinder_position_in_centre_of_slice[1] + roi_length, cylinder_position_in_centre_of_slice[0] - roi_length:cylinder_position_in_centre_of_slice[0] + roi_length]);
+        test_image = copy.deepcopy(CT_lsf[cylinder_position_in_centre_of_slice[1] - roi_length:cylinder_position_in_centre_of_slice[1] + roi_length, cylinder_position_in_centre_of_slice[0] - roi_length:cylinder_position_in_centre_of_slice[0] + roi_length]);
+
+        volume = sitk.GetImageFromArray(CT_lsf);
+        volume.SetSpacing([pixel_spacing_in_mm, pixel_spacing_in_mm, pixel_spacing_in_mm]);
+        sitk.WriteImage(volume, output_directory + "/reconstruction_CT_lsf_" + str(lsf_id) + ".mha", useCompression=True);
+
+        volume = sitk.GetImageFromArray(CT_lsf[cylinder_position_in_centre_of_slice[1] - roi_length:cylinder_position_in_centre_of_slice[1] + roi_length,
+                                        cylinder_position_in_centre_of_slice[0] - roi_length:cylinder_position_in_centre_of_slice[0] + roi_length]);
+        volume.SetSpacing([pixel_spacing_in_mm, pixel_spacing_in_mm, pixel_spacing_in_mm]);
+        sitk.WriteImage(volume, output_directory + "/reconstruction_CT_lsf_fibre_centre_" + str(lsf_id) + ".mha", useCompression=True);
+
+        comp_equalized = compare_images(reference_image, test_image, method='checkerboard');
+        volume = sitk.GetImageFromArray(comp_equalized)
+        sitk.WriteImage(volume, output_directory + "/lsf_comp_fibre_" + str(lsf_id) + ".mha", useCompression=True);
+
+        comp_equalized -= np.min(comp_equalized);
+        comp_equalized /= np.max(comp_equalized);
+        comp_equalized *= 255;
+        comp_equalized = np.array(comp_equalized, dtype=np.uint8);
+        io.imsave(output_directory + "/lsf_comp_fibre_" + str(lsf_id) + ".png", comp_equalized);
+
+        comp_equalized = compare_images(reference_CT, CT_lsf, method='checkerboard');
+        volume = sitk.GetImageFromArray(comp_equalized)
+        sitk.WriteImage(volume, output_directory + "/lsf_comp_slice_" + str(lsf_id) + ".mha", useCompression=True);
+
+        comp_equalized -= np.min(comp_equalized);
+        comp_equalized /= np.max(comp_equalized);
+        comp_equalized *= 255;
+        comp_equalized = np.array(comp_equalized, dtype=np.uint8);
+        io.imsave(output_directory + "/lsf_comp_slice_" + str(lsf_id) + ".png", comp_equalized);
+
+        lsf_id += 1;
+
+
+    # reference_image = (reference_image - reference_image.mean()) / reference_image.std();
+    # test_image = (test_image - test_image.mean()) / test_image.std();
+    # ZNCC_fibre = np.mean(np.multiply(reference_image.flatten(), test_image.flatten()));
+    print("IND", x[0], x[1], x[2], x[3], x[4], x[5], x[6], fitness);
+
+    return MAE_sinogram;
 
 
 def reconstructAndStoreResults(simulated_sinogram, aPrefix):
