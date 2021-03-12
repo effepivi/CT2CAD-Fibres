@@ -517,17 +517,17 @@ if os.path.isfile(output_directory + "/laplacian1.dat"):
 # Perform the registration using CMA-ES
 else:
 
-    sigma_core = 2;
+    sigma_core = 5.;
     sigma_fibre = 0.75;
     sigma_matrix = 0.6;
 
-    k_core = 10;
+    k_core = 1000;
     k_fibre = 1000;
-    k_matrix = 800.0;
+    k_matrix = 1000.0;
 
     x0 = [sigma_core, k_core, sigma_fibre, k_fibre, sigma_matrix, k_matrix, Simulation.fibre_radius];
     bounds = [[0.005, 0.0, 0.005, 0.0, 0.005, 0.0, 0.95 * Simulation.fibre_radius],
-              [2.5, 250, 2.5, 2000, 2.5, 2000, 1.15 * Simulation.fibre_radius]];
+              [10.0, 2000, 2.5, 2000, 2.5, 2000, 1.15 * Simulation.fibre_radius]];
 
     best_fitness = sys.float_info.max;
     laplacian_id = 0;
@@ -578,7 +578,7 @@ for label, sigma, k in zip(["core", "fibre", "matrix"], [Simulation.sigma_core, 
     np.savetxt(output_directory + "/laplacian_kernel_" + label + ".dat", Simulation.laplacian(pixel_range, sigma) * k);
 
 
-
+'''
 ################################################################################
 ##### OPTIMISE THE LSF
 ################################################################################
@@ -669,7 +669,7 @@ print("lsf CT ZNCC:", ZNCC_CT);
 
 
 
-
+'''
 
 
 
