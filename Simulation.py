@@ -688,7 +688,8 @@ def fitnessFunctionLaplacian(x):
 
     # Simulate a sinogram
     simulated_sinogram, normalised_projections, raw_projections_in_keV = simulateSinogram([sigma_core, sigma_fibre, sigma_matrix], [k_core, k_fibre, k_matrix], ["core", "fibre", "matrix"]);
-    normalised_simulated_sinogram = (simulated_sinogram - simulated_sinogram.mean()) / simulated_sinogram.std();
+    MAE_sinogram = np.mean(np.abs(np.subtract(reference_sinogram.flatten(), simulated_sinogram.flatten())));
+    '''normalised_simulated_sinogram = (simulated_sinogram - simulated_sinogram.mean()) / simulated_sinogram.std();
     MAE_sinogram = np.mean(np.abs(normalised_simulated_sinogram.flatten() - normalised_reference_sinogram.flatten()));
     ZNCC_sinogram = np.mean(np.multiply(normalised_simulated_sinogram.flatten(), normalised_reference_sinogram.flatten()));
 
@@ -700,7 +701,6 @@ def fitnessFunctionLaplacian(x):
     # reference_image = copy.deepcopy(normalised_reference_CT[cylinder_position_in_centre_of_slice[1] - roi_length:cylinder_position_in_centre_of_slice[1] + roi_length, cylinder_position_in_centre_of_slice[0] - roi_length:cylinder_position_in_centre_of_slice[0] + roi_length]);
     # test_image = copy.deepcopy(normalised_CT_laplacian[cylinder_position_in_centre_of_slice[1] - roi_length:cylinder_position_in_centre_of_slice[1] + roi_length, cylinder_position_in_centre_of_slice[0] - roi_length:cylinder_position_in_centre_of_slice[0] + roi_length]);
 
-    # MAE_sinogram = np.mean(np.abs(np.subtract(reference_sinogram.flatten(), simulated_sinogram.flatten())));
 
     #
     # normalised_simulated_sinogram.shape = (normalised_simulated_sinogram.size // normalised_simulated_sinogram.shape[2], normalised_simulated_sinogram.shape[2]);
@@ -808,8 +808,8 @@ def fitnessFunctionLaplacian(x):
     # test_image = (test_image - test_image.mean()) / test_image.std();
     # ZNCC_fibre = np.mean(np.multiply(reference_image.flatten(), test_image.flatten()));
     print("IND", x[0], x[1], x[2], x[3], x[4], x[5], x[6], fitness, ZNCC_sinogram);
-
-    return fitness;
+    '''
+    return MAE_sinogram;
 
 
 
