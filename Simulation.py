@@ -866,3 +866,80 @@ def findFibreInCentreOfCtSlice():
             cylinder_position_in_centre_of_slice = copy.deepcopy(centre);
 
     return cylinder_position_in_centre_of_slice;
+
+
+def create_circular_mask(h, w, center=None, radius=None):
+
+    if center is None: # use the middle of the image
+        center = (int(w/2), int(h/2))
+    if radius is None: # use the smallest distance between the center and image walls
+        radius = min(center[0], center[1], w-center[0], h-center[1])
+
+    Y, X = np.ogrid[:h, :w]
+    dist_from_center = np.sqrt((X - center[0])**2 + (Y-center[1])**2)
+
+    mask = dist_from_center <= radius
+    return np.array(mask, dtype=bool);
+
+def createMasks(mask_shape):
+    fibre_radius_in_px = fibre_radius / pixel_spacing_in_micrometre
+    core_radius_in_px = core_radius / pixel_spacing_in_micrometre
+
+    core_mask = create_circular_mask(mask_shape[1], mask_shape[0], None, core_radius_in_px);
+
+    fibre_mask = create_circular_mask(mask_shape[1], mask_shape[0], None, fibre_radius_in_px);
+    matrix_mask = np.logical_not(fibre_mask);
+
+    #fibre_mask = np.subtract(fibre_mask, core_mask);
+    fibre_mask = np.bitwise_xor(fibre_mask, core_mask);
+
+    #TypeError: numpy boolean subtract, the `-` operator, is not supported, use the bitwise_xor, the `^` operator, or the logical_xor function instead.
+
+    return core_mask, fibre_mask, matrix_mask
+
+def printMuStatistics(text, reference_fibre_in_centre, test_fibre_in_centre, core_mask, fibre_mask, matrix_mask):
+
+    index = np.nonzero(core_mask);
+    print(text, "CORE REF (MIN, MEDIAN, MAX, MEAN, STDDEV):",
+            np.min(reference_fibre_in_centre[index]),
+            np.median(reference_fibre_in_centre[index]),
+            np.max(reference_fibre_in_centre[index]),
+            np.mean(reference_fibre_in_centre[index]),
+            np.std(reference_fibre_in_centre[index]));
+
+    print(text, "CORE SIMULATED (MIN, MEDIAN, MAX, MEAN, STDDEV):",
+            np.min(test_fibre_in_centre[index]),
+            np.median(test_fibre_in_centre[index]),
+            np.max(test_fibre_in_centre[index]),
+            np.mean(test_fibre_in_centre[index]),
+            np.std(test_fibre_in_centre[index]));
+
+    index = np.nonzero(fibre_mask);
+    print(text, "FIBRE REF (MIN, MEDIAN, MAX, MEAN, STDDEV):",
+            np.min(reference_fibre_in_centre[index]),
+            np.median(reference_fibre_in_centre[index]),
+            np.max(reference_fibre_in_centre[index]),
+            np.mean(reference_fibre_in_centre[index]),
+            np.std(reference_fibre_in_centre[index]));
+
+    print(text, "FIBRE SIMULATED (MIN, MEDIAN, MAX, MEAN, STDDEV):",
+            np.min(test_fibre_in_centre[index]),
+            np.median(test_fibre_in_centre[index]),
+            np.max(test_fibre_in_centre[index]),
+            np.mean(test_fibre_in_centre[index]),
+            np.std(test_fibre_in_centre[index]));
+
+    index = np.nonzero(matrix_mask);
+    print(text, "MATRIX REF (MIN, MEDIAN, MAX, MEAN, STDDEV):",
+            np.min(reference_fibre_in_centre[index]),
+            np.median(reference_fibre_in_centre[index]),
+            np.max(reference_fibre_in_centre[index]),
+            np.mean(reference_fibre_in_centre[index]),
+            np.std(reference_fibre_in_centre[index]));
+
+    print(text, "MATRIX SIMULATED (MIN, MEDIAN, MAX, MEAN, STDDEV):",
+            np.min(test_fibre_in_centre[index]),
+            np.median(test_fibre_in_centre[index]),
+            np.max(test_fibre_in_centre[index]),
+            np.mean(test_fibre_in_centre[index]),
+            np.std(test_fibre_in_centre[index]));

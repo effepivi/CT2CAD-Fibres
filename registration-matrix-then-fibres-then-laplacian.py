@@ -519,15 +519,15 @@ else:
 
     sigma_core = 2;
     sigma_fibre = 0.75;
-    sigma_matrix = 0.5;
+    sigma_matrix = 0.6;
 
-    k_core = 1;
-    k_fibre = 250;
-    k_matrix = 40.0;
+    k_core = 10;
+    k_fibre = 1000;
+    k_matrix = 800.0;
 
     x0 = [sigma_core, k_core, sigma_fibre, k_fibre, sigma_matrix, k_matrix, Simulation.fibre_radius];
     bounds = [[0.005, 0.0, 0.005, 0.0, 0.005, 0.0, 0.95 * Simulation.fibre_radius],
-              [2.5, 250, 2.5, 1000, 2.5, 1000, 1.15 * Simulation.fibre_radius]];
+              [2.5, 250, 2.5, 2000, 2.5, 2000, 1.15 * Simulation.fibre_radius]];
 
     best_fitness = sys.float_info.max;
     laplacian_id = 0;
@@ -541,9 +541,9 @@ else:
     opts['CMA_stds'] = [0.25, 20.25, 0.25, 20.25, 0.25, 20.25, Simulation.fibre_radius * 0.1];
 
 
-    #IND 2.19746627320312	1.16136683253601	0.763740221230013	249.875214879601	0.503314643902767	38.2390121454358	53.2213098006193	    0.084343959685696	0.992778341956513
-    #IND 2.07828517522359	8.86453347432242E-05	0.755930952404442	249.992034434311	0.483822894369194	23.3017161885803	53.4611294410208	0.08427650560267	0.992771013383053
-
+    # IND 2.19746627320312	1.16136683253601	0.763740221230013	249.875214879601	0.503314643902767	38.2390121454358	53.2213098006193	    0.084343959685696	0.992778341956513
+    # IND 2.07828517522359	8.86453347432242E-05	0.755930952404442	249.992034434311	0.483822894369194	23.3017161885803	53.4611294410208	0.08427650560267	0.992771013383053
+    # IND 0.22475860581346976 7.3330722215476225 0.6901736846902663 997.9090436639837 0.629128141527589 807.8482231256484 53.63342291025315 0.07658148986147018 0.9941233938771149
     es = cma.CMAEvolutionStrategy(x0, 0.25, opts);
     es.optimize(Simulation.fitnessFunctionLaplacian);
     elapsed_time = time.time() - start_time
@@ -573,133 +573,51 @@ print("Laplacian1 CT ZNCC:", ZNCC_CT);
 
 pixel_range = np.linspace(-Simulation.value_range, Simulation.value_range, num=int(Simulation.num_samples), endpoint=True);
 
-laplacian_kernel = k_core * Simulation.laplacian(pixel_range, sigma_core);
-np.savetxt(output_directory + "/laplacian_kernel_core.dat", laplacian_kernel);
+for label, sigma, k in zip(["core", "fibre", "matrix"], [sigma_core, sigma_fibre, sigma_matrix], [k_core, k_fibre, k_matrix]):
+    np.savetxt(output_directory + "/laplacian_kernel_" + label + ".dat", Simulation.laplacian(pixel_range, sigma) * k);
 
-laplacian_kernel = k_fibre * Simulation.laplacian(pixel_range, sigma_fibre);
-np.savetxt(output_directory + "/laplacian_kernel_fibre.dat", laplacian_kernel);
 
-laplacian_kernel = k_matrix * Simulation.laplacian(pixel_range, sigma_matrix);
-np.savetxt(output_directory + "/laplacian_kernel_matrix.dat", laplacian_kernel);
 
-#
-#
-# fibre_radius_in_px = Simulation.fibre_radius / Simulation.pixel_spacing_in_micrometre
-# core_radius_in_px = core_radius / Simulation.pixel_spacing_in_micrometre
-#
-# def create_circular_mask(h, w, center=None, radius=None):
-#
-#     if center is None: # use the middle of the image
-#         center = (int(w/2), int(h/2))
-#     if radius is None: # use the smallest distance between the center and image walls
-#         radius = min(center[0], center[1], w-center[0], h-center[1])
-#
-#     Y, X = np.ogrid[:h, :w]
-#     dist_from_center = np.sqrt((X - center[0])**2 + (Y-center[1])**2)
-#
-#     mask = dist_from_center <= radius
-#     return np.array(mask, dtype=bool);
-#
-#
-#
-#
-# pixel_range = np.linspace(-Simulation.value_range, Simulation.value_range, num=int(Simulation.num_samples), endpoint=True)
-#
-# for label, sigma, k in zip(["core", "fibre", "matrix"], [sigma_core, sigma_fibre, sigma_matrix], [k_core, k_fibre, k_matrix]):
-#     np.savetxt(output_directory + "/laplacian_" + label + ".txt", Simulation.laplacian(pixel_range, sigma) * k);
-#
-#
-#
-#
-#
-# test_fibre_in_centre = np.array(copy.deepcopy(CT_slice_from_simulated_sinogram[cylinder_position_in_centre_of_slice[1] - Simulation.roi_length:cylinder_position_in_centre_of_slice[1] + Simulation.roi_length, cylinder_position_in_centre_of_slice[0] - Simulation.roi_length:cylinder_position_in_centre_of_slice[0] + Simulation.roi_length]));
-#
-# reference_fibre_in_centre = np.array(copy.deepcopy(Simulation.reference_CT[cylinder_position_in_centre_of_slice[1] - Simulation.roi_length:cylinder_position_in_centre_of_slice[1] + Simulation.roi_length, cylinder_position_in_centre_of_slice[0] - Simulation.roi_length:cylinder_position_in_centre_of_slice[0] + Simulation.roi_length]));
-#
-#
-#
-#
-#
-#
-# volume = sitk.GetImageFromArray(test_fibre_in_centre);
-# volume.SetSpacing([Simulation.pixel_spacing_in_mm, Simulation.pixel_spacing_in_mm, Simulation.pixel_spacing_in_mm]);
-# sitk.WriteImage(volume, output_directory + "/simulated_fibre_in_centre.mha", useCompression=True);
-#
-#
-# volume = sitk.GetImageFromArray(reference_fibre_in_centre);
-# volume.SetSpacing([Simulation.pixel_spacing_in_mm, Simulation.pixel_spacing_in_mm, Simulation.pixel_spacing_in_mm]);
-# sitk.WriteImage(volume, output_directory + "/reference_fibre_in_centre.mha", useCompression=True);
-#
-# np.savetxt(output_directory + "/profile_reference_fibre_in_centre.txt", np.diag(reference_fibre_in_centre));
-# np.savetxt(output_directory + "/profile_simulated_fibre_in_centre.txt", np.diag(test_fibre_in_centre));
-#
-#
-# mask_shape = reference_fibre_in_centre.shape;
-#
-# core_mask = create_circular_mask(mask_shape[1], mask_shape[0], None, core_radius_in_px);
-#
-# fibre_mask = create_circular_mask(mask_shape[1], mask_shape[0], None, fibre_radius_in_px);
-# matrix_mask = np.logical_not(fibre_mask);
-#
-# #fibre_mask = np.subtract(fibre_mask, core_mask);
-# fibre_mask = np.bitwise_xor(fibre_mask, core_mask);
-#
-# #TypeError: numpy boolean subtract, the `-` operator, is not supported, use the bitwise_xor, the `^` operator, or the logical_xor function instead.
-#
-#
-# core_mask = ndimage.binary_erosion(core_mask).astype(core_mask.dtype);
-# np.savetxt(output_directory + "/core_mask.txt", core_mask);
-#
-# fibre_mask = ndimage.binary_erosion(fibre_mask).astype(core_mask.dtype);
-# np.savetxt(output_directory + "/fibre_mask.txt", fibre_mask);
-#
-# matrix_mask = ndimage.binary_erosion(matrix_mask).astype(core_mask.dtype);
-# np.savetxt(output_directory + "/matrix_mask.txt", matrix_mask);
-#
-#
-#
-#
-# index = np.nonzero(core_mask);
-# print("CORE REF (MIN, MEDIAN, MAX, MEAN, STDDEV):",
-#         np.min(reference_fibre_in_centre[index]),
-#         np.median(reference_fibre_in_centre[index]),
-#         np.max(reference_fibre_in_centre[index]),
-#         np.mean(reference_fibre_in_centre[index]),
-#         np.std(reference_fibre_in_centre[index]));
-#
-# print("CORE SIMULATED (MIN, MEDIAN, MAX, MEAN, STDDEV):",
-#         np.min(test_fibre_in_centre[index]),
-#         np.median(test_fibre_in_centre[index]),
-#         np.max(test_fibre_in_centre[index]),
-#         np.mean(test_fibre_in_centre[index]),
-#         np.std(test_fibre_in_centre[index]));
-#
-# index = np.nonzero(fibre_mask);
-# print("FIBRE REF (MIN, MEDIAN, MAX, MEAN, STDDEV):",
-#         np.min(reference_fibre_in_centre[index]),
-#         np.median(reference_fibre_in_centre[index]),
-#         np.max(reference_fibre_in_centre[index]),
-#         np.mean(reference_fibre_in_centre[index]),
-#         np.std(reference_fibre_in_centre[index]));
-#
-# print("FIBRE SIMULATED (MIN, MEDIAN, MAX, MEAN, STDDEV):",
-#         np.min(test_fibre_in_centre[index]),
-#         np.median(test_fibre_in_centre[index]),
-#         np.max(test_fibre_in_centre[index]),
-#         np.mean(test_fibre_in_centre[index]),
-#         np.std(test_fibre_in_centre[index]));
-#
-# index = np.nonzero(matrix_mask);
-# print("MATRIX REF (MIN, MEDIAN, MAX, MEAN, STDDEV):",
-#         np.min(reference_fibre_in_centre[index]),
-#         np.median(reference_fibre_in_centre[index]),
-#         np.max(reference_fibre_in_centre[index]),
-#         np.mean(reference_fibre_in_centre[index]),
-#         np.std(reference_fibre_in_centre[index]));
-#
-# print("MATRIX SIMULATED (MIN, MEDIAN, MAX, MEAN, STDDEV):",
-#         np.min(test_fibre_in_centre[index]),
-#         np.median(test_fibre_in_centre[index]),
-#         np.max(test_fibre_in_centre[index]),
-#         np.mean(test_fibre_in_centre[index]),
-#         np.std(test_fibre_in_centre[index]));
+
+
+
+
+
+
+
+
+
+
+
+# Find the fibre in the centre of the reference and simulated slices
+test_fibre_in_centre = np.array(copy.deepcopy(CT_slice_from_simulated_sinogram[Simulation.cylinder_position_in_centre_of_slice[1] - Simulation.roi_length:Simulation.cylinder_position_in_centre_of_slice[1] + Simulation.roi_length, Simulation.cylinder_position_in_centre_of_slice[0] - Simulation.roi_length:Simulation.cylinder_position_in_centre_of_slice[0] + Simulation.roi_length]));
+reference_fibre_in_centre = np.array(copy.deepcopy(Simulation.reference_CT[Simulation.cylinder_position_in_centre_of_slice[1] - Simulation.roi_length:Simulation.cylinder_position_in_centre_of_slice[1] + Simulation.roi_length, Simulation.cylinder_position_in_centre_of_slice[0] - Simulation.roi_length:Simulation.cylinder_position_in_centre_of_slice[0] + Simulation.roi_length]));
+
+#  Save the corresponding fibres
+volume = sitk.GetImageFromArray(test_fibre_in_centre);
+volume.SetSpacing([Simulation.pixel_spacing_in_mm, Simulation.pixel_spacing_in_mm, Simulation.pixel_spacing_in_mm]);
+sitk.WriteImage(volume, output_directory + "/simulated_fibre_in_centre.mha", useCompression=True);
+
+volume = sitk.GetImageFromArray(reference_fibre_in_centre);
+volume.SetSpacing([Simulation.pixel_spacing_in_mm, Simulation.pixel_spacing_in_mm, Simulation.pixel_spacing_in_mm]);
+sitk.WriteImage(volume, output_directory + "/reference_fibre_in_centre.mha", useCompression=True);
+
+# Save the corresponding diagonal profiles
+np.savetxt(output_directory + "/profile_reference_fibre_in_centre.txt", np.diag(reference_fibre_in_centre));
+np.savetxt(output_directory + "/profile_simulated_fibre_in_centre.txt", np.diag(test_fibre_in_centre));
+
+# Create the binary masks
+mask_shape = reference_fibre_in_centre.shape;
+core_mask, fibre_mask, matrix_mask = Simulation.createMasks(mask_shape);
+
+# Save the binary masks
+core_mask = ndimage.binary_erosion(core_mask).astype(core_mask.dtype);
+np.savetxt(output_directory + "/core_mask.txt", core_mask);
+
+fibre_mask = ndimage.binary_erosion(fibre_mask).astype(core_mask.dtype);
+np.savetxt(output_directory + "/fibre_mask.txt", fibre_mask);
+
+matrix_mask = ndimage.binary_erosion(matrix_mask).astype(core_mask.dtype);
+np.savetxt(output_directory + "/matrix_mask.txt", matrix_mask);
+
+Simulation.printMuStatistics("Laplacian1", reference_fibre_in_centre, test_fibre_in_centre, core_mask, fibre_mask, matrix_mask);
