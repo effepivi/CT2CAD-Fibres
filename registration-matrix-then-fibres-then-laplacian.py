@@ -574,13 +574,13 @@ print("Laplacian1 CT ZNCC:", ZNCC_CT);
 pixel_range = np.linspace(-Simulation.value_range, Simulation.value_range, num=int(Simulation.num_samples), endpoint=True);
 
 laplacian_kernel = k_core * Simulation.laplacian(pixel_range, sigma_core);
-np.savetxt(output_directory + "/laplacian_kernel_core.dat", laplacian_kernel_core);
+np.savetxt(output_directory + "/laplacian_kernel_core.dat", laplacian_kernel);
 
 laplacian_kernel = k_fibre * Simulation.laplacian(pixel_range, sigma_fibre);
-np.savetxt(output_directory + "/laplacian_kernel_fibre.dat", laplacian_kernel_fibre);
+np.savetxt(output_directory + "/laplacian_kernel_fibre.dat", laplacian_kernel);
 
 laplacian_kernel = k_matrix * Simulation.laplacian(pixel_range, sigma_matrix);
-np.savetxt(output_directory + "/laplacian_kernel_matrix.dat", laplacian_kernel_matrix);
+np.savetxt(output_directory + "/laplacian_kernel_matrix.dat", laplacian_kernel);
 
 #
 #
