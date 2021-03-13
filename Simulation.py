@@ -405,6 +405,7 @@ temp_count=0;
 def simulateSinogram(sigma_set = None, k_set = None, name_set = None):
 
     global temp_count;
+    global lsf_kernel;
 
     # Do not simulate the phase contrast using a Laplacian
     if isinstance(sigma_set, NoneType) or isinstance(k_set, NoneType) or isinstance(name_set, NoneType):
@@ -820,22 +821,28 @@ def fitnessFunctionLaplacian(x):
     '''
     return MAE_sinogram;
 
-best_fitness = sys.float_info.max;
 lsf_id = 0;
 
 def fitnessFunctionLSF(x):
     global best_fitness;
     global lsf_id;
+    global lsf_kernel;
 
-    Simulation.a2 = x[0];
-    Simulation.b2 = x[1];
-    Simulation.c2 = x[2];
-    Simulation.d2 = x[3];
-    Simulation.e2 = x[4];
-    Simulation.f2 = x[5];
+
+    a2 = x[0];
+    b2 = x[1];
+    c2 = x[2];
+    d2 = x[3];
+    e2 = x[4];
+    f2 = x[5];
+
+    # The response of the detector as the line-spread function (LSF)
+    t = np.arange(-20., 21., 1.);
+    lsf_kernel=lsf(t*41, a2, b2, c2, d2, e2, f2);
+    lsf_kernel/=lsf_kernel.sum();
 
     # Simulate a sinogram
-    simulated_sinogram, normalised_projections, raw_projections_in_keV = simulateSinogram([Simulation.sigma_core, Simulation.sigma_fibre, Simulation.sigma_matrix], [Simulation.k_core, Simulation.k_fibre, Simulation.k_matrix], ["core", "fibre", "matrix"]);
+    simulated_sinogram, normalised_projections, raw_projections_in_keV = simulateSinogram([sigma_core, sigma_fibre, sigma_matrix], [k_core, k_fibre, k_matrix], ["core", "fibre", "matrix"]);
     MAE_sinogram = np.mean(np.abs(np.subtract(reference_sinogram.flatten(), simulated_sinogram.flatten())));
     '''normalised_simulated_sinogram = (simulated_sinogram - simulated_sinogram.mean()) / simulated_sinogram.std();
     MAE_sinogram = np.mean(np.abs(normalised_simulated_sinogram.flatten() - normalised_reference_sinogram.flatten()));
@@ -904,7 +911,7 @@ def fitnessFunctionLSF(x):
 
 
     # SSIM_fibre = ssim(reference_image, test_image, data_range=reference_image.max() - reference_image.min())
-    '''
+    
     fitness = MAE_sinogram;
     # fitness = MAE_fibre;
     # fitness = MAE_CT;
@@ -949,13 +956,15 @@ def fitnessFunctionLSF(x):
         comp_equalized = np.array(comp_equalized, dtype=np.uint8);
         io.imsave(output_directory + "/lsf_comp_slice_" + str(lsf_id) + ".png", comp_equalized);
 
+        print("***", x[0], x[1], x[2], x[3], x[4], x[5], fitness);
+
         lsf_id += 1;
 
 
     # reference_image = (reference_image - reference_image.mean()) / reference_image.std();
     # test_image = (test_image - test_image.mean()) / test_image.std();
     # ZNCC_fibre = np.mean(np.multiply(reference_image.flatten(), test_image.flatten()));
-    print("IND", x[0], x[1], x[2], x[3], x[4], x[5], x[6], fitness);
+    print("IND", x[0], x[1], x[2], x[3], x[4], x[5], fitness);'''
 
     return MAE_sinogram;
 
