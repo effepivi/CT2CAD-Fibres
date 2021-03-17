@@ -823,18 +823,31 @@ def fitnessFunctionLaplacian(x):
 
 lsf_id = 0;
 
-def fitnessFunctionLSF(x):
+def fitnessFunctionLaplacianLSF(x):
     global best_fitness;
     global lsf_id;
     global lsf_kernel;
 
+    sigma_core = x[0];
+    k_core = x[1];
+    sigma_fibre = x[2];
+    k_fibre = x[3];
+    sigma_matrix = x[4];
+    k_matrix = x[5];
+    fibre_radius = x[6];
 
-    a2 = x[0];
-    b2 = x[1];
-    c2 = x[2];
-    d2 = x[3];
-    e2 = x[4];
-    f2 = x[5];
+    # Load the matrix
+    setMatrix(matrix_geometry_parameters);
+
+    # Load the cores and fibres
+    setFibres(centroid_set);
+
+    a2 = x[7];
+    b2 = x[8];
+    c2 = x[9];
+    d2 = x[10];
+    e2 = x[11];
+    f2 = x[12];
 
     # The response of the detector as the line-spread function (LSF)
     t = np.arange(-20., 21., 1.);
@@ -844,8 +857,9 @@ def fitnessFunctionLSF(x):
     # Simulate a sinogram
     simulated_sinogram, normalised_projections, raw_projections_in_keV = simulateSinogram([sigma_core, sigma_fibre, sigma_matrix], [k_core, k_fibre, k_matrix], ["core", "fibre", "matrix"]);
     MAE_sinogram = np.mean(np.abs(np.subtract(reference_sinogram.flatten(), simulated_sinogram.flatten())));
-    '''normalised_simulated_sinogram = (simulated_sinogram - simulated_sinogram.mean()) / simulated_sinogram.std();
-    MAE_sinogram = np.mean(np.abs(normalised_simulated_sinogram.flatten() - normalised_reference_sinogram.flatten()));
+
+    normalised_simulated_sinogram = (simulated_sinogram - simulated_sinogram.mean()) / simulated_sinogram.std();
+    # MAE_sinogram = np.mean(np.abs(normalised_simulated_sinogram.flatten() - normalised_reference_sinogram.flatten()));
     ZNCC_sinogram = np.mean(np.multiply(normalised_simulated_sinogram.flatten(), normalised_reference_sinogram.flatten()));
 
     # # Reconstruct the corresponding CT slice
@@ -911,7 +925,7 @@ def fitnessFunctionLSF(x):
 
 
     # SSIM_fibre = ssim(reference_image, test_image, data_range=reference_image.max() - reference_image.min())
-    
+
     fitness = MAE_sinogram;
     # fitness = MAE_fibre;
     # fitness = MAE_CT;
@@ -929,34 +943,34 @@ def fitnessFunctionLSF(x):
 
         volume = sitk.GetImageFromArray(CT_lsf);
         volume.SetSpacing([pixel_spacing_in_mm, pixel_spacing_in_mm, pixel_spacing_in_mm]);
-        sitk.WriteImage(volume, output_directory + "/reconstruction_CT_lsf_" + str(lsf_id) + ".mha", useCompression=True);
+        sitk.WriteImage(volume, output_directory + "/reconstruction_CT_laplacian-lsf_" + str(lsf_id) + ".mha", useCompression=True);
 
         volume = sitk.GetImageFromArray(CT_lsf[cylinder_position_in_centre_of_slice[1] - roi_length:cylinder_position_in_centre_of_slice[1] + roi_length,
                                         cylinder_position_in_centre_of_slice[0] - roi_length:cylinder_position_in_centre_of_slice[0] + roi_length]);
         volume.SetSpacing([pixel_spacing_in_mm, pixel_spacing_in_mm, pixel_spacing_in_mm]);
-        sitk.WriteImage(volume, output_directory + "/reconstruction_CT_lsf_fibre_centre_" + str(lsf_id) + ".mha", useCompression=True);
+        sitk.WriteImage(volume, output_directory + "/reconstruction_CT_laplacian-lsf_fibre_centre_" + str(lsf_id) + ".mha", useCompression=True);
 
         comp_equalized = compare_images(reference_image, test_image, method='checkerboard');
         volume = sitk.GetImageFromArray(comp_equalized)
-        sitk.WriteImage(volume, output_directory + "/lsf_comp_fibre_" + str(lsf_id) + ".mha", useCompression=True);
+        sitk.WriteImage(volume, output_directory + "/laplacian-LSF_comp_fibre_" + str(lsf_id) + ".mha", useCompression=True);
 
         comp_equalized -= np.min(comp_equalized);
         comp_equalized /= np.max(comp_equalized);
         comp_equalized *= 255;
         comp_equalized = np.array(comp_equalized, dtype=np.uint8);
-        io.imsave(output_directory + "/lsf_comp_fibre_" + str(lsf_id) + ".png", comp_equalized);
+        io.imsave(output_directory + "/laplacian-LSF_comp_fibre_" + str(lsf_id) + ".png", comp_equalized);
 
         comp_equalized = compare_images(reference_CT, CT_lsf, method='checkerboard');
         volume = sitk.GetImageFromArray(comp_equalized)
-        sitk.WriteImage(volume, output_directory + "/lsf_comp_slice_" + str(lsf_id) + ".mha", useCompression=True);
+        sitk.WriteImage(volume, output_directory + "/laplacian-LSF_comp_slice_" + str(lsf_id) + ".mha", useCompression=True);
 
         comp_equalized -= np.min(comp_equalized);
         comp_equalized /= np.max(comp_equalized);
         comp_equalized *= 255;
         comp_equalized = np.array(comp_equalized, dtype=np.uint8);
-        io.imsave(output_directory + "/lsf_comp_slice_" + str(lsf_id) + ".png", comp_equalized);
+        io.imsave(output_directory + "/laplacian-LSF_comp_slice_" + str(lsf_id) + ".png", comp_equalized);
 
-        print("***", x[0], x[1], x[2], x[3], x[4], x[5], fitness);
+        print("***", x[0], x[1], x[2], x[3], x[4], x[5], x[6], x[7], x[8], x[9], x[10], x[11], x[12], fitness);
 
         lsf_id += 1;
 
@@ -964,7 +978,7 @@ def fitnessFunctionLSF(x):
     # reference_image = (reference_image - reference_image.mean()) / reference_image.std();
     # test_image = (test_image - test_image.mean()) / test_image.std();
     # ZNCC_fibre = np.mean(np.multiply(reference_image.flatten(), test_image.flatten()));
-    print("IND", x[0], x[1], x[2], x[3], x[4], x[5], fitness);'''
+    print("IND", x[0], x[1], x[2], x[3], x[4], x[5], x[6], x[7], x[8], x[9], x[10], x[11], x[12], fitness);
 
     return MAE_sinogram;
 
