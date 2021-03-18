@@ -80,7 +80,7 @@ Simulation.output_directory = output_directory;
 
 # Target of the registration
 start_time = time.time();
-reference_sinogram, reference_CT, normalised_reference_sinogram, normalised_reference_CT = Simulation.createTargetFromRawSinogram(args.input[0]);
+reference_normalised_projections, reference_sinogram, reference_CT, normalised_reference_sinogram, normalised_reference_CT = Simulation.createTargetFromRawSinogram(args.input[0]);
 elapsed_time = time.time() - start_time
 print("RECONSTRUCTION:", elapsed_time);
 

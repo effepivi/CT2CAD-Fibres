@@ -69,7 +69,7 @@ def createTargetFromRawSinogram(fname):
     normalised_reference_sinogram = (reference_sinogram - reference_sinogram.mean()) / reference_sinogram.std();
     normalised_reference_CT       = (reference_CT       - reference_CT.mean())       / reference_CT.std();
 
-    return reference_sinogram, reference_CT, normalised_reference_sinogram, normalised_reference_CT;
+    return reference_normalised_projections, reference_sinogram, reference_CT, normalised_reference_sinogram, normalised_reference_CT;
 
 def initGVXR():
     """This function initialises the simulation framework on the GPU and
