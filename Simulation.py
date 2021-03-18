@@ -834,20 +834,13 @@ def fitnessFunctionLaplacianLSF(x):
     k_fibre = x[3];
     sigma_matrix = x[4];
     k_matrix = x[5];
-    fibre_radius = x[6];
 
-    # Load the matrix
-    setMatrix(matrix_geometry_parameters);
-
-    # Load the cores and fibres
-    setFibres(centroid_set);
-
-    a2 = x[7];
-    b2 = x[8];
-    c2 = x[9];
-    d2 = x[10];
-    e2 = x[11];
-    f2 = x[12];
+    a2 = x[6];
+    b2 = x[7];
+    c2 = x[8];
+    d2 = x[9];
+    e2 = x[10];
+    f2 = x[11];
 
     # The response of the detector as the line-spread function (LSF)
     t = np.arange(-20., 21., 1.);
@@ -858,7 +851,7 @@ def fitnessFunctionLaplacianLSF(x):
     simulated_sinogram, normalised_projections, raw_projections_in_keV = simulateSinogram([sigma_core, sigma_fibre, sigma_matrix], [k_core, k_fibre, k_matrix], ["core", "fibre", "matrix"]);
     MAE_sinogram = np.mean(np.abs(np.subtract(reference_sinogram.flatten(), simulated_sinogram.flatten())));
 
-    normalised_simulated_sinogram = (simulated_sinogram - simulated_sinogram.mean()) / simulated_sinogram.std();
+    '''normalised_simulated_sinogram = (simulated_sinogram - simulated_sinogram.mean()) / simulated_sinogram.std();
     # MAE_sinogram = np.mean(np.abs(normalised_simulated_sinogram.flatten() - normalised_reference_sinogram.flatten()));
     ZNCC_sinogram = np.mean(np.multiply(normalised_simulated_sinogram.flatten(), normalised_reference_sinogram.flatten()));
 
@@ -970,7 +963,7 @@ def fitnessFunctionLaplacianLSF(x):
         comp_equalized = np.array(comp_equalized, dtype=np.uint8);
         io.imsave(output_directory + "/laplacian-LSF_comp_slice_" + str(lsf_id) + ".png", comp_equalized);
 
-        print("***", x[0], x[1], x[2], x[3], x[4], x[5], x[6], x[7], x[8], x[9], x[10], x[11], x[12], fitness);
+        print("***", x[0], x[1], x[2], x[3], x[4], x[5], x[6], x[7], x[8], x[9], x[10], x[11], fitness);
 
         lsf_id += 1;
 
@@ -979,7 +972,7 @@ def fitnessFunctionLaplacianLSF(x):
     # test_image = (test_image - test_image.mean()) / test_image.std();
     # ZNCC_fibre = np.mean(np.multiply(reference_image.flatten(), test_image.flatten()));
     print("IND", x[0], x[1], x[2], x[3], x[4], x[5], x[6], x[7], x[8], x[9], x[10], x[11], x[12], fitness);
-
+    '''
     return MAE_sinogram;
 
 
