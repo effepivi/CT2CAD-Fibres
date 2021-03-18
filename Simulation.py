@@ -828,19 +828,19 @@ def fitnessFunctionLaplacianLSF(x):
     global lsf_id;
     global lsf_kernel;
 
-    sigma_core = x[0];
-    k_core = x[1];
-    sigma_fibre = x[2];
-    k_fibre = x[3];
-    sigma_matrix = x[4];
-    k_matrix = x[5];
+    # sigma_core = x[0];
+    k_core = x[0];
+    # sigma_fibre = x[2];
+    k_fibre = x[1];
+    # sigma_matrix = x[4];
+    k_matrix = x[2];
 
-    a2 = x[6];
-    b2 = x[7];
-    c2 = x[8];
-    d2 = x[9];
-    e2 = x[10];
-    f2 = x[11];
+    a2 = x[3];
+    b2 = x[4];
+    c2 = x[5];
+    d2 = x[6];
+    e2 = x[7];
+    f2 = x[8];
 
     # The response of the detector as the line-spread function (LSF)
     t = np.arange(-20., 21., 1.);

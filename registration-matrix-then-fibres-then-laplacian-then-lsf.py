@@ -646,12 +646,9 @@ if not DEBUG_FLAG:
 # The registration has already been performed. Load the results.
 if os.path.isfile(output_directory + "/laplacian3.dat") and os.path.isfile(output_directory + "/lsf2.dat"):
     temp = np.loadtxt(output_directory + "/laplacian3.dat");
-    Simulation.sigma_core = temp[0];
-    Simulation.k_core = temp[1];
-    Simulation.sigma_fibre = temp[2];
-    Simulation.k_fibre = temp[3];
-    Simulation.sigma_matrix = temp[4];
-    Simulation.k_matrix = temp[5];
+    Simulation.k_core = temp[0];
+    Simulation.k_fibre = temp[1];
+    Simulation.k_matrix = temp[2];
 
     temp = np.loadtxt(output_directory + "/lsf2.dat");
     Simulation.a2 = temp[0];
@@ -675,34 +672,34 @@ else:
     Simulation.best_fitness = sys.float_info.max;
 
     x0 = [
-        Simulation.sigma_core, Simulation.k_core,
-        Simulation.sigma_fibre, Simulation.k_fibre,
-        Simulation.sigma_matrix, Simulation.k_matrix,
+        Simulation.k_core,
+        Simulation.k_fibre,
+        Simulation.k_matrix,
         a2, b2, c2, d2, e2, f2
     ];
 
     bounds = [
         [
-            0.005, 900.0,
-            0.005, 0.0,
-            0.005, 0.0,
+            0.0,
+            0.0,
+            0.0,
             a2 - a2 / 2.,
-            0.,
+            b2 - b2 / 2.,
             c2 + c2 / 2.,
             d2 - d2 / 2.,
             e2 - e2 / 2.,
-            0.0
+            f2 - f2/ 2.
         ],
         [
-            10.0, 1500,
-            2.5, 2000,
-            2.5, 2000,
+            3000,
+            3000,
+            3000,
             a2 + a2 / 2.,
-            b2 + b2,
+            b2 + b2 / 2.,
             c2 - c2 / 2.,
             d2 + d2 / 2.,
             e2 + e2 / 2.,
-            f2 + f2.
+            f2 + f2/ 2.
         ]
     ];
 
@@ -715,7 +712,7 @@ else:
     opts['bounds'] = bounds;
     #opts['seed'] = 987654321;
     # opts['maxiter'] = 5;
-    opts['CMA_stds'] = [0.25, 20.25, 0.25, 20.25, 0.25, 20.25,
+    opts['CMA_stds'] = [20.25, 20.25, 20.25,
         a2 * 0.2, b2 * 0.2, -c2 * 0.2, d2 * 0.2, e2 * 0.2, f2 * 0.2];
 
 
@@ -727,21 +724,18 @@ else:
     elapsed_time = time.time() - start_time
     print("LAPLACIAN-LSF",elapsed_time);
 
-    Simulation.sigma_core = es.result.xbest[0];
-    Simulation.k_core = es.result.xbest[1];
-    Simulation.sigma_fibre = es.result.xbest[2];
-    Simulation.k_fibre = es.result.xbest[3];
-    Simulation.sigma_matrix = es.result.xbest[4];
-    Simulation.k_matrix = es.result.xbest[5];
+    Simulation.k_core = es.result.xbest[0];
+    Simulation.k_fibre = es.result.xbest[1];
+    Simulation.k_matrix = es.result.xbest[2];
 
-    Simulation.a2 = es.result.xbest[6];
-    Simulation.b2 = es.result.xbest[7];
-    Simulation.c2 = es.result.xbest[8];
-    Simulation.d2 = es.result.xbest[9];
-    Simulation.e2 = es.result.xbest[10];
-    Simulation.f2 = es.result.xbest[11];
+    Simulation.a2 = es.result.xbest[3];
+    Simulation.b2 = es.result.xbest[4];
+    Simulation.c2 = es.result.xbest[5];
+    Simulation.d2 = es.result.xbest[6];
+    Simulation.e2 = es.result.xbest[7];
+    Simulation.f2 = es.result.xbest[8];
 
-    np.savetxt(output_directory + "/laplacian3.dat", [Simulation.sigma_core, Simulation.k_core, Simulation.sigma_fibre, Simulation.k_fibre, Simulation.sigma_matrix, Simulation.k_matrix], header='sigma_core, k_core, sigma_fibre, k_fibre, sigma_matrix, k_matrix');
+    np.savetxt(output_directory + "/laplacian3.dat", [Simulation.k_core, Simulation.k_fibre, Simulation.k_matrix], header='k_core, k_fibre, k_matrix');
     np.savetxt(output_directory + "/lsf2.dat", [Simulation.a2, Simulation.b2, Simulation.c2, Simulation.d2, Simulation.e2, Simulation.f2], header='a2, b2, c2, d2, e2, f2');
 
 
@@ -758,7 +752,7 @@ if not DEBUG_FLAG:
 
     # Store the corresponding results on the disk
     ZNCC_CT, CT_slice_from_simulated_sinogram = Simulation.reconstructAndStoreResults(simulated_sinogram, output_directory + "/laplacian-LSF");
-    print("Laplacian-LSF params:", Simulation.sigma_core, Simulation.sigma_fibre, Simulation.sigma_matrix, Simulation.k_core, Simulation.k_fibre, Simulation.k_matrix);
+    print("Laplacian-LSF params:", Simulation.k_core, Simulation.k_fibre, Simulation.k_matrix);
     print("lsf params:", Simulation.a2, Simulation.b2, Simulation.c2, Simulation.d2, Simulation.e2, Simulation.f2);
     print("Laplacian-LSF CT ZNCC:", ZNCC_CT);
 
