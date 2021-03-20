@@ -5,6 +5,8 @@ from skimage.transform import iradon
 from skimage.util import compare_images
 import skimage.io as io
 
+from scipy import ndimage
+
 import SimpleITK as sitk
 import cv2
 
@@ -349,7 +351,7 @@ def flatFieldCorrection(raw_projections_in_keV):
     dark_field_image = np.zeros(raw_projections_in_keV.shape);
 
     # Create a mock flat field image
-    flat_field_image = np.zeros(raw_projections_in_keV.shape);
+    flat_field_image = np.ones(raw_projections_in_keV.shape);
 
     # Retrieve the total energy
     total_energy = 0.0;
@@ -358,10 +360,12 @@ def flatFieldCorrection(raw_projections_in_keV):
 
     for energy, count in zip(energy_bins, photon_count_per_bin):
         total_energy += energy * count;
-    flat_field_image = np.ones(raw_projections_in_keV.shape) * total_energy;
+    flat_field_image *= total_energy;
 
     # Apply the actual flat-field correction on the raw projections
-    return (raw_projections_in_keV - dark_field_image) / (flat_field_image - dark_field_image);
+    corrected_projections = (raw_projections_in_keV - dark_field_image) / (flat_field_image - dark_field_image);
+
+    return corrected_projections;
 
 
 def laplacian(x, sigma):
@@ -441,8 +445,8 @@ def simulateSinogram(sigma_set = None, k_set = None, name_set = None):
             # print(laplacian_kernels[label].shape)
             for z in range(phase_contrast_image.shape[0]):
                 for y in range(phase_contrast_image.shape[1]):
-                    phase_contrast_image[z][y] += np.convolve((L_buffer_set[label])[z][y], laplacian_kernels[label], mode='same');
-
+                    # phase_contrast_image[z][y] += np.convolve((L_buffer_set[label])[z][y], laplacian_kernels[label], mode='same');
+                    phase_contrast_image[z][y] += ndimage.convolve((L_buffer_set[label])[z][y], laplacian_kernels[label], mode='wrap');
 
         for energy, photon_count in zip(gvxr.getEnergyBins("keV"), gvxr.getPhotonCountEnergyBins()):
 
@@ -461,7 +465,7 @@ def simulateSinogram(sigma_set = None, k_set = None, name_set = None):
             # Store the projection for this energy channel
             raw_projections_in_keV += energy * photon_count * np.exp(-attenuation);
 
-        # Apply the phase contrastt
+        # Apply the phase contrast
         raw_projections_in_keV -= phase_contrast_image;
 
         # phase_contrast_image.shape = [900, 1024];
@@ -472,7 +476,8 @@ def simulateSinogram(sigma_set = None, k_set = None, name_set = None):
     # Apply the LSF line by line
     for z in range(raw_projections_in_keV.shape[0]):
         for y in range(raw_projections_in_keV.shape[1]):
-            raw_projections_in_keV[z][y] = np.convolve(raw_projections_in_keV[z][y], lsf_kernel, mode='same');
+            # raw_projections_in_keV[z][y] = np.convolve(raw_projections_in_keV[z][y], lsf_kernel, mode='same');
+            raw_projections_in_keV[z][y] = ndimage.convolve(raw_projections_in_keV[z][y], lsf_kernel, mode='wrap');
 
     normalised_projections = flatFieldCorrection(raw_projections_in_keV);
     simulated_sinogram = computeSinogramFromFlatField(normalised_projections);
@@ -498,7 +503,6 @@ def fitnessFunctionCube(x):
     # Simulate a sinogram
     simulated_sinogram, normalised_projections, raw_projections_in_keV = simulateSinogram();
     normalised_simulated_sinogram = (simulated_sinogram - simulated_sinogram.mean()) / simulated_sinogram.std();
-
 
     # Compute the fitness function
     MAE = np.mean(np.abs(np.subtract(normalised_simulated_sinogram.flatten(), normalised_reference_sinogram.flatten())));
@@ -698,7 +702,17 @@ def fitnessFunctionLaplacian(x):
 
     # Simulate a sinogram
     simulated_sinogram, normalised_projections, raw_projections_in_keV = simulateSinogram([sigma_core, sigma_fibre, sigma_matrix], [k_core, k_fibre, k_matrix], ["core", "fibre", "matrix"]);
-    MAE_sinogram = np.mean(np.abs(np.subtract(reference_sinogram.flatten(), simulated_sinogram.flatten())));
+
+    # Add the noise
+    map = (normalised_projections + bias) * gain;
+    map[map < 0] = 0;
+    noise_map = np.random.poisson(map);
+
+    normalised_projections += scale * noise_map;
+    simulated_sinogram = computeSinogramFromFlatField(normalised_projections);
+
+    normalised_simulated_sinogram = (simulated_sinogram - simulated_sinogram.mean()) / simulated_sinogram.std();
+    MAE = np.mean(np.abs(normalised_simulated_sinogram.flatten() - normalised_reference_sinogram.flatten()));
     '''normalised_simulated_sinogram = (simulated_sinogram - simulated_sinogram.mean()) / simulated_sinogram.std();
     MAE_sinogram = np.mean(np.abs(normalised_simulated_sinogram.flatten() - normalised_reference_sinogram.flatten()));
     ZNCC_sinogram = np.mean(np.multiply(normalised_simulated_sinogram.flatten(), normalised_reference_sinogram.flatten()));
@@ -819,7 +833,7 @@ def fitnessFunctionLaplacian(x):
     # ZNCC_fibre = np.mean(np.multiply(reference_image.flatten(), test_image.flatten()));
     print("IND", x[0], x[1], x[2], x[3], x[4], x[5], x[6], fitness, ZNCC_sinogram);
     '''
-    return MAE_sinogram;
+    return MAE;
 
 lsf_id = 0;
 
@@ -849,7 +863,16 @@ def fitnessFunctionLaplacianLSF(x):
 
     # Simulate a sinogram
     simulated_sinogram, normalised_projections, raw_projections_in_keV = simulateSinogram([sigma_core, sigma_fibre, sigma_matrix], [k_core, k_fibre, k_matrix], ["core", "fibre", "matrix"]);
-    MAE_sinogram = np.mean(np.abs(np.subtract(reference_sinogram.flatten(), simulated_sinogram.flatten())));
+
+    # Add the noise
+    map = (normalised_projections + bias) * gain;
+    map[map < 0] = 0;
+    noise_map = np.random.poisson(map);
+    normalised_projections += scale * noise_map;
+    simulated_sinogram = computeSinogramFromFlatField(normalised_projections);
+
+    normalised_simulated_sinogram = (simulated_sinogram - simulated_sinogram.mean()) / simulated_sinogram.std();
+    MAE = np.mean(np.abs(normalised_simulated_sinogram.flatten() - normalised_reference_sinogram.flatten()));
 
     '''normalised_simulated_sinogram = (simulated_sinogram - simulated_sinogram.mean()) / simulated_sinogram.std();
     # MAE_sinogram = np.mean(np.abs(normalised_simulated_sinogram.flatten() - normalised_reference_sinogram.flatten()));
@@ -973,7 +996,52 @@ def fitnessFunctionLaplacianLSF(x):
     # ZNCC_fibre = np.mean(np.multiply(reference_image.flatten(), test_image.flatten()));
     print("IND", x[0], x[1], x[2], x[3], x[4], x[5], x[6], x[7], x[8], x[9], x[10], x[11], x[12], fitness);
     '''
-    return MAE_sinogram;
+    return MAE;
+
+fitness_noise_counter = 0;
+def fitnessFunctionNoise(x):
+    global best_fitness, fitness_noise_counter;
+
+    bias = x[0];
+    gain = x[1];
+    scale = x[2];
+
+    # Poisson noise
+    map = (normalised_projections_ROI + bias) * gain;
+    map[map < 0] = 0;
+    noise_map = np.random.poisson(map);
+
+    # Add the noise
+    noisy_image = normalised_projections_ROI + scale * noise_map;
+
+    noisy_image_noise_ROI_stddev = 0;
+    for y in range(noisy_image.shape[0]):
+        noisy_image_noise_ROI_stddev += noisy_image[y].std();
+    noisy_image_noise_ROI_stddev /= noisy_image.shape[0];
+
+    # Difference of std dev between the reference and the simulated image
+    diff = reference_noise_ROI_stddev - noisy_image_noise_ROI_stddev;
+    fitness = diff * diff;
+
+    # if best_fitness > fitness:
+    #     best_fitness = fitness;
+    #
+    #     print("IND", x[0], x[1], x[2],
+    #         reference_noise_ROI.min(), noisy_image.min(),
+    #         reference_noise_ROI.max(), noisy_image.max(),
+    #         reference_noise_ROI_stddev, noisy_image.std(),
+    #         noise_map.min(), noise_map.max(),
+    #         fitness)
+    #
+    #     volume = sitk.GetImageFromArray(noise_map.astype(np.float32));
+    #     sitk.WriteImage(volume, output_directory + "/noise_map-" + str(fitness_noise_counter) + ".mha", useCompression=True);
+    #
+    #     volume = sitk.GetImageFromArray(noisy_image);
+    #     sitk.WriteImage(volume, output_directory + "/noisy_image-" + str(fitness_noise_counter) + ".mha", useCompression=True);
+    #
+    #     fitness_noise_counter += 1;
+
+    return fitness;
 
 
 def reconstructAndStoreResults(simulated_sinogram, aPrefix):
