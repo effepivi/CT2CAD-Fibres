@@ -340,6 +340,21 @@ Simulation.centroid_set = Simulation.findCircles(Simulation.reference_CT);
 # Find the position of the fibre that in the most in the centre of the CT slice
 Simulation.findFibreInCentreOfCtSlice();
 
+# Create the binary masks
+reference_fibre_in_centre = np.array(copy.deepcopy(Simulation.reference_CT[Simulation.cylinder_position_in_centre_of_slice[1] - Simulation.roi_length:Simulation.cylinder_position_in_centre_of_slice[1] + Simulation.roi_length, Simulation.cylinder_position_in_centre_of_slice[0] - Simulation.roi_length:Simulation.cylinder_position_in_centre_of_slice[0] + Simulation.roi_length]));
+mask_shape = reference_fibre_in_centre.shape;
+core_mask, fibre_mask, matrix_mask = Simulation.createMasks(mask_shape);
+
+# Save the binary masks
+core_mask = ndimage.binary_erosion(core_mask).astype(core_mask.dtype);
+np.savetxt(output_directory + "/core_mask1.txt", core_mask);
+
+fibre_mask = ndimage.binary_erosion(fibre_mask).astype(core_mask.dtype);
+np.savetxt(output_directory + "/fibre_mask1.txt", fibre_mask);
+
+matrix_mask = ndimage.binary_erosion(matrix_mask).astype(core_mask.dtype);
+np.savetxt(output_directory + "/matrix_mask1.txt", matrix_mask);
+
 
 ################################################################################
 ##### OPTIMISE THE RADII AFTER OPTIMISING THE CUBE FROM SCRATCH
@@ -462,6 +477,21 @@ Simulation.centroid_set = Simulation.refineCentrePositions(Simulation.centroid_s
 
 # Find the position of the fibre that in the most in the centre of the CT slice
 Simulation.findFibreInCentreOfCtSlice();
+
+# Create the binary masks
+reference_fibre_in_centre = np.array(copy.deepcopy(Simulation.reference_CT[Simulation.cylinder_position_in_centre_of_slice[1] - Simulation.roi_length:Simulation.cylinder_position_in_centre_of_slice[1] + Simulation.roi_length, Simulation.cylinder_position_in_centre_of_slice[0] - Simulation.roi_length:Simulation.cylinder_position_in_centre_of_slice[0] + Simulation.roi_length]));
+mask_shape = reference_fibre_in_centre.shape;
+core_mask, fibre_mask, matrix_mask = Simulation.createMasks(mask_shape);
+
+# Save the binary masks
+core_mask = ndimage.binary_erosion(core_mask).astype(core_mask.dtype);
+np.savetxt(output_directory + "/core_mask2.txt", core_mask);
+
+fibre_mask = ndimage.binary_erosion(fibre_mask).astype(core_mask.dtype);
+np.savetxt(output_directory + "/fibre_mask2.txt", fibre_mask);
+
+matrix_mask = ndimage.binary_erosion(matrix_mask).astype(core_mask.dtype);
+np.savetxt(output_directory + "/matrix_mask2.txt", matrix_mask);
 
 # Apply the result of the registration
 Simulation.setMatrix(Simulation.matrix_geometry_parameters);
@@ -819,7 +849,21 @@ Simulation.centroid_set = Simulation.refineCentrePositions(Simulation.centroid_s
 
 # Find the position of the fibre that in the most in the centre of the CT slice
 Simulation.findFibreInCentreOfCtSlice();
+
+# Create the binary masks
 reference_fibre_in_centre = np.array(copy.deepcopy(Simulation.reference_CT[Simulation.cylinder_position_in_centre_of_slice[1] - Simulation.roi_length:Simulation.cylinder_position_in_centre_of_slice[1] + Simulation.roi_length, Simulation.cylinder_position_in_centre_of_slice[0] - Simulation.roi_length:Simulation.cylinder_position_in_centre_of_slice[0] + Simulation.roi_length]));
+mask_shape = reference_fibre_in_centre.shape;
+core_mask, fibre_mask, matrix_mask = Simulation.createMasks(mask_shape);
+
+# Save the binary masks
+core_mask = ndimage.binary_erosion(core_mask).astype(core_mask.dtype);
+np.savetxt(output_directory + "/core_mask3.txt", core_mask);
+
+fibre_mask = ndimage.binary_erosion(fibre_mask).astype(core_mask.dtype);
+np.savetxt(output_directory + "/fibre_mask3.txt", fibre_mask);
+
+matrix_mask = ndimage.binary_erosion(matrix_mask).astype(core_mask.dtype);
+np.savetxt(output_directory + "/matrix_mask3.txt", matrix_mask);
 
 # Apply the result of the registration
 Simulation.setMatrix(Simulation.matrix_geometry_parameters);
