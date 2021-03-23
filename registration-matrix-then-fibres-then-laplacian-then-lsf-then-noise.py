@@ -73,10 +73,16 @@ Simulation.use_sinogram = args.sinogram;
 
 
 
+print("METRICS: ", Simulation.metrics_function);
+if Simulation.use_normalisation:
+    print("WITH ZERO-MEAN, UNIT-VARIANCE NORMALISATION");
+else:
+    print("WITHOUT ZERO-MEAN, UNIT-VARIANCE NORMALISATION");
 
-
-
-
+if Simulation.use_sinogram:
+    print("COMPUTED ON SINOGRAMS");
+else:
+    print("COMPUTED ON PROJECTIONS");
 
 
 
