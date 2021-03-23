@@ -41,6 +41,16 @@ def processCmdLine():
     parser = argparse.ArgumentParser(description='Compute the path length using gVirtualXRay (http://gvirtualxray.sourceforge.net/).')
     parser.add_argument('--input', help='Sinogram file', nargs=1, type=str, required=True);
     parser.add_argument('--output', help='Output dir', nargs=1, type=str, required=True);
+    parser.add_argument('--metrics', help='MAE, RMSE, or MRE', nargs=1, type=str, required=True);
+    
+    parser.add_argument('--normalisation', dest='normalisation', action='store_true')
+    parser.add_argument('--no-normalisation', dest='normalisation', action='store_false')
+    parser.set_defaults(normalisation=True)
+
+    parser.add_argument('--sinogram', dest='sinogram', action='store_true')
+    parser.add_argument('--projections', dest='sinogram', action='store_false')
+    parser.set_defaults(sinogram=True)
+    
     return parser.parse_args()
 
 
@@ -57,9 +67,9 @@ if not os.path.exists(output_directory):
 Simulation.output_directory = output_directory;
 
 
-
-
-
+Simulation.metrics_function = args.metrics[0];
+Simulation.use_normalisation = args.normalisation;
+Simulation.use_sinogram = args.sinogram;
 
 
 
@@ -329,6 +339,8 @@ if not DEBUG_FLAG:
     print("Matrix1 params:", Simulation.matrix_geometry_parameters);
     print("Matrix1 CT ZNCC:", ZNCC_CT);
 
+
+exit()
 
 ################################################################################
 ##### FIND CIRCLES
@@ -931,9 +943,9 @@ else:
 
     bounds = [
         [
-            1250-500,
-            1250-500,
-            1250-500,
+            Simulation.k_core-500,
+            Simulation.k_fibre-500,
+            Simulation.k_matrix-500,
             a2 - a2 / 4.,
             b2 - b2 / 4.,
             c2 + c2 / 4.,
@@ -942,9 +954,9 @@ else:
             f2 - f2/ 4.
         ],
         [
-            1250+500,
-            1250+500,
-            1250+500,
+            Simulation.k_core+500,
+            Simulation.k_fibre+500,
+            Simulation.k_matrix+500,
             a2 + a2 / 4.,
             b2 + b2 / 4.,
             c2 - c2 / 4.,

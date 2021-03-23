@@ -1,4 +1,4 @@
-import copy, sys
+import copy, sys, math
 import numpy as np
 
 from skimage.transform import iradon
@@ -42,6 +42,30 @@ d2 = 0.469614;
 e2 = 6.32561e+09;
 f2 = 1.0;
 
+use_normalisation = False;
+metrics_function = "MAE"
+
+def metrics(ref, test):
+
+    if use_normalisation:
+        normalised_ref  = ( ref -  ref.mean()) /  ref.std();
+        normalised_test = (test - test.mean()) / test.std();
+    else:
+       normalised_ref = ref;
+       normalised_test = test;
+       
+    # Mean absolute error
+    if metrics_function == "MAE":
+        return np.mean(np.abs(np.subtract(normalised_ref.flatten(), normalised_test.flatten())));
+    # RMSE
+    elif metrics_function == "RMSE":
+        return math.sqrt(np.mean(np.square(np.subtract(normalised_ref.flatten(), normalised_test.flatten()))));
+    # Mean relative error
+    elif metrics_function == "MRE":
+        return np.mean(np.abs(np.divide(np.subtract(normalised_ref.flatten(), normalised_test.flatten()), normalised_ref.flatten())));
+    else:
+        raise "Unknown metrics";
+    
 def createTargetFromRawSinogram(fname):
     """This function read the binary file fname. This file contains
     the projections after flat-field correction.
@@ -56,6 +80,7 @@ def createTargetFromRawSinogram(fname):
     global reference_CT;
     global normalised_reference_sinogram;
     global normalised_reference_CT;
+    global reference_normalised_projections;
 
     # Load the projections after flat-field correction from fname as a binary file in float32.
     reference_normalised_projections = np.fromfile(fname, dtype=np.float32);
@@ -484,6 +509,8 @@ def simulateSinogram(sigma_set = None, k_set = None, name_set = None):
 
     return simulated_sinogram, normalised_projections, raw_projections_in_keV;
 
+
+    
 def fitnessFunctionCube(x):
     global best_fitness;
     global matrix_id;
@@ -502,15 +529,13 @@ def fitnessFunctionCube(x):
 
     # Simulate a sinogram
     simulated_sinogram, normalised_projections, raw_projections_in_keV = simulateSinogram();
-    normalised_simulated_sinogram = (simulated_sinogram - simulated_sinogram.mean()) / simulated_sinogram.std();
 
-    # Compute the fitness function
-    MAE = np.mean(np.abs(np.subtract(normalised_simulated_sinogram.flatten(), normalised_reference_sinogram.flatten())));
-    #MAE = np.mean(np.abs(np.subtract(reference_sinogram.flatten(), simulated_sinogram.flatten())));
-#     ZNCC = np.mean(np.multiply(normalised_simulated_sinogram.flatten(), normalised_reference_sinogram.flatten()));
-
-    return MAE;
-
+    # return metrics(normalised_reference_sinogram, normalised_simulated_sinogram);
+    
+    if use_sinogram:
+        return metrics(reference_sinogram, simulated_sinogram);
+    else:
+        return metrics(reference_normalised_projections, normalised_projections);
 
 def float2uint8(anImage):
     uchar_image = copy.deepcopy(anImage);
@@ -645,33 +670,11 @@ def fitnessFunctionFibres(x):
 
     # Simulate a sinogram
     simulated_sinogram, normalised_projections, raw_projections_in_keV = simulateSinogram();
-    normalised_simulated_sinogram = (simulated_sinogram - simulated_sinogram.mean()) / simulated_sinogram.std();
-    MAE = np.mean(np.abs(normalised_simulated_sinogram.flatten() - normalised_reference_sinogram.flatten()));
-    #MAE = np.mean(np.abs(np.subtract(reference_sinogram.flatten(), simulated_sinogram.flatten())));
-    # ZNCC = np.mean(np.multiply(normalised_simulated_sinogram.flatten(), normalised_reference_sinogram.flatten()));
 
-    # Reconstruct the corresponding CT slice
-#     theta = theta / 180.0 * math.pi;
-#     rot_center = int(simulated_sinogram.shape[2]/2);
-#     reconstruction_tomopy = tomopy.recon(simulated_sinogram, theta, center=rot_center, algorithm="gridrec", sinogram_order=False);
-
-
-    #simulated_sinogram.shape = (simulated_sinogram.size // simulated_sinogram.shape[2], simulated_sinogram.shape[2]);
-    #reconstruction_tomopy = iradon(simulated_sinogram.T, theta=theta, circle=True);
-    #normalised_simulated_CT = (reconstruction_tomopy - reconstruction_tomopy.mean()) / reconstruction_tomopy.std();
-    #MAE_CT = np.mean(np.abs(normalised_simulated_CT.flatten() - normalised_reference_CT.flatten()));
-    #ZNCC_CT = np.mean(np.multiply(normalised_simulated_CT.flatten(), normalised_reference_CT.flatten()));
-
-    # Save the data
-    fitness = MAE;
-
-    # if best_fitness > fitness:
-    #     best_fitness = fitness;
-
-
-
-
-    return fitness;
+    if use_sinogram:
+        return metrics(reference_sinogram, simulated_sinogram);
+    else:
+        return metrics(reference_normalised_projections, normalised_projections);
 
 best_fitness = sys.float_info.max;
 laplacian_id = 0;
@@ -711,129 +714,10 @@ def fitnessFunctionLaplacian(x):
     normalised_projections += scale * noise_map;
     simulated_sinogram = computeSinogramFromFlatField(normalised_projections);
 
-    normalised_simulated_sinogram = (simulated_sinogram - simulated_sinogram.mean()) / simulated_sinogram.std();
-    MAE = np.mean(np.abs(normalised_simulated_sinogram.flatten() - normalised_reference_sinogram.flatten()));
-    '''normalised_simulated_sinogram = (simulated_sinogram - simulated_sinogram.mean()) / simulated_sinogram.std();
-    MAE_sinogram = np.mean(np.abs(normalised_simulated_sinogram.flatten() - normalised_reference_sinogram.flatten()));
-    ZNCC_sinogram = np.mean(np.multiply(normalised_simulated_sinogram.flatten(), normalised_reference_sinogram.flatten()));
-
-    # # Reconstruct the corresponding CT slice
-    # simulated_sinogram.shape = (simulated_sinogram.size // simulated_sinogram.shape[2], simulated_sinogram.shape[2]);
-    # CT_laplacian = iradon(simulated_sinogram.T, theta=theta, circle=True);
-    # normalised_CT_laplacian = (CT_laplacian - CT_laplacian.mean()) / CT_laplacian.std();
-    #
-    # reference_image = copy.deepcopy(normalised_reference_CT[cylinder_position_in_centre_of_slice[1] - roi_length:cylinder_position_in_centre_of_slice[1] + roi_length, cylinder_position_in_centre_of_slice[0] - roi_length:cylinder_position_in_centre_of_slice[0] + roi_length]);
-    # test_image = copy.deepcopy(normalised_CT_laplacian[cylinder_position_in_centre_of_slice[1] - roi_length:cylinder_position_in_centre_of_slice[1] + roi_length, cylinder_position_in_centre_of_slice[0] - roi_length:cylinder_position_in_centre_of_slice[0] + roi_length]);
-
-
-    #
-    # normalised_simulated_sinogram.shape = (normalised_simulated_sinogram.size // normalised_simulated_sinogram.shape[2], normalised_simulated_sinogram.shape[2]);
-    #
-    # SSIM_sinogram = ssim(normalised_simulated_sinogram, normalised_reference_sinogram, data_range=normalised_reference_sinogram.max() - normalised_reference_sinogram.min())
-
-    # Reconstruct the corresponding CT slice
-#     theta = theta / 180.0 * math.pi;
-#     rot_center = int(simulated_sinogram.shape[2]/2);
-#     reconstruction_tomopy = tomopy.recon(simulated_sinogram, theta, center=rot_center, algorithm="gridrec", sinogram_order=False);
-
-
-
-
-
-    # simulated_sinogram.shape = (simulated_sinogram.size // simulated_sinogram.shape[2], simulated_sinogram.shape[2]);
-    # CT_laplacian = iradon(simulated_sinogram.T, theta=theta, circle=True);
-
-
-    # offset = min(np.min(CT_laplacian), np.min(reference_CT));
-    #
-    # reconstruction_CT_laplacian = CT_laplacian - offset;
-    # reference_CT = reference_CT - offset;
-    # reconstruction_CT_laplacian += 0.5;
-    # reference_CT += 0.5;
-    #
-    # reconstruction_CT_laplacian = np.log(reconstruction_CT_laplacian);
-    # reference_CT = np.log(reference_CT);
-    #
-    # normalised_simulated_CT = (reconstruction_CT_laplacian - reconstruction_CT_laplacian.mean()) / reconstruction_CT_laplacian.std();
-    # temp_reference_CT = (reference_CT - reference_CT.mean()) / reference_CT.std();
-    #
-    # MAE_CT = np.mean(np.abs(np.subtract(reference_CT.flatten(), CT_laplacian.flatten())));
-    # ZNCC_CT = np.mean(np.multiply(normalised_reference_CT.flatten(), normalised_CT_laplacian.flatten()));
-    # SSIM_CT = ssim(normalised_simulated_CT, temp_reference_CT, data_range=temp_reference_CT.max() - temp_reference_CT.min())
-    #
-    #
-    #
-    # index = np.nonzero(core_mask);
-    # diff_core = math.pow(np.mean(reference_image[index]) - np.mean(test_image[index]), 2);
-    #
-    # index = np.nonzero(fibre_mask);
-    # diff_fibre = math.pow(np.mean(reference_image[index]) - np.mean(test_image[index]), 2);
-    #
-    # index = np.nonzero(matrix_mask);
-    # diff_matrix = math.pow(np.mean(reference_image[index]) - np.mean(test_image[index]), 2);
-    #
-    #
-    #
-
-
-    # MAE_fibre = np.mean(np.abs(np.subtract(reference_image.flatten(), test_image.flatten())));
-
-
-    # SSIM_fibre = ssim(reference_image, test_image, data_range=reference_image.max() - reference_image.min())
-
-    fitness = MAE_sinogram;
-    # fitness = MAE_fibre;
-    # fitness = MAE_CT;
-    #fitness = 1 / (ZNCC_CT + 1);
-
-    if best_fitness > fitness:
-        best_fitness = fitness;
-
-        simulated_sinogram.shape = (simulated_sinogram.size // simulated_sinogram.shape[2], simulated_sinogram.shape[2]);
-        CT_laplacian = iradon(simulated_sinogram.T, theta=theta, circle=True);
-        normalised_CT_laplacian = (CT_laplacian - CT_laplacian.mean()) / CT_laplacian.std();
-
-        reference_image = copy.deepcopy(reference_CT[cylinder_position_in_centre_of_slice[1] - roi_length:cylinder_position_in_centre_of_slice[1] + roi_length, cylinder_position_in_centre_of_slice[0] - roi_length:cylinder_position_in_centre_of_slice[0] + roi_length]);
-        test_image = copy.deepcopy(CT_laplacian[cylinder_position_in_centre_of_slice[1] - roi_length:cylinder_position_in_centre_of_slice[1] + roi_length, cylinder_position_in_centre_of_slice[0] - roi_length:cylinder_position_in_centre_of_slice[0] + roi_length]);
-
-        volume = sitk.GetImageFromArray(CT_laplacian);
-        volume.SetSpacing([pixel_spacing_in_mm, pixel_spacing_in_mm, pixel_spacing_in_mm]);
-        sitk.WriteImage(volume, output_directory + "/reconstruction_CT_laplacian_" + str(laplacian_id) + ".mha", useCompression=True);
-
-        volume = sitk.GetImageFromArray(CT_laplacian[cylinder_position_in_centre_of_slice[1] - roi_length:cylinder_position_in_centre_of_slice[1] + roi_length,
-                                        cylinder_position_in_centre_of_slice[0] - roi_length:cylinder_position_in_centre_of_slice[0] + roi_length]);
-        volume.SetSpacing([pixel_spacing_in_mm, pixel_spacing_in_mm, pixel_spacing_in_mm]);
-        sitk.WriteImage(volume, output_directory + "/reconstruction_CT_laplacian_fibre_centre_" + str(laplacian_id) + ".mha", useCompression=True);
-
-        comp_equalized = compare_images(reference_image, test_image, method='checkerboard');
-        volume = sitk.GetImageFromArray(comp_equalized)
-        sitk.WriteImage(volume, output_directory + "/laplacian_comp_fibre_" + str(laplacian_id) + ".mha", useCompression=True);
-
-        comp_equalized -= np.min(comp_equalized);
-        comp_equalized /= np.max(comp_equalized);
-        comp_equalized *= 255;
-        comp_equalized = np.array(comp_equalized, dtype=np.uint8);
-        io.imsave(output_directory + "/laplacian_comp_fibre_" + str(laplacian_id) + ".png", comp_equalized);
-
-        comp_equalized = compare_images(reference_CT, CT_laplacian, method='checkerboard');
-        volume = sitk.GetImageFromArray(comp_equalized)
-        sitk.WriteImage(volume, output_directory + "/laplacian_comp_slice_" + str(laplacian_id) + ".mha", useCompression=True);
-
-        comp_equalized -= np.min(comp_equalized);
-        comp_equalized /= np.max(comp_equalized);
-        comp_equalized *= 255;
-        comp_equalized = np.array(comp_equalized, dtype=np.uint8);
-        io.imsave(output_directory + "/laplacian_comp_slice_" + str(laplacian_id) + ".png", comp_equalized);
-
-        laplacian_id += 1;
-
-
-    # reference_image = (reference_image - reference_image.mean()) / reference_image.std();
-    # test_image = (test_image - test_image.mean()) / test_image.std();
-    # ZNCC_fibre = np.mean(np.multiply(reference_image.flatten(), test_image.flatten()));
-    print("IND", x[0], x[1], x[2], x[3], x[4], x[5], x[6], fitness, ZNCC_sinogram);
-    '''
-    return MAE;
+    if use_sinogram:
+        return metrics(reference_sinogram, simulated_sinogram);
+    else:
+        return metrics(reference_normalised_projections, normalised_projections);
 
 lsf_id = 0;
 
@@ -871,132 +755,10 @@ def fitnessFunctionLaplacianLSF(x):
     normalised_projections += scale * noise_map;
     simulated_sinogram = computeSinogramFromFlatField(normalised_projections);
 
-    normalised_simulated_sinogram = (simulated_sinogram - simulated_sinogram.mean()) / simulated_sinogram.std();
-    MAE = np.mean(np.abs(normalised_simulated_sinogram.flatten() - normalised_reference_sinogram.flatten()));
-
-    '''normalised_simulated_sinogram = (simulated_sinogram - simulated_sinogram.mean()) / simulated_sinogram.std();
-    # MAE_sinogram = np.mean(np.abs(normalised_simulated_sinogram.flatten() - normalised_reference_sinogram.flatten()));
-    ZNCC_sinogram = np.mean(np.multiply(normalised_simulated_sinogram.flatten(), normalised_reference_sinogram.flatten()));
-
-    # # Reconstruct the corresponding CT slice
-    # simulated_sinogram.shape = (simulated_sinogram.size // simulated_sinogram.shape[2], simulated_sinogram.shape[2]);
-    # CT_lsf = iradon(simulated_sinogram.T, theta=theta, circle=True);
-    # normalised_CT_lsf = (CT_lsf - CT_lsf.mean()) / CT_lsf.std();
-    #
-    # reference_image = copy.deepcopy(normalised_reference_CT[cylinder_position_in_centre_of_slice[1] - roi_length:cylinder_position_in_centre_of_slice[1] + roi_length, cylinder_position_in_centre_of_slice[0] - roi_length:cylinder_position_in_centre_of_slice[0] + roi_length]);
-    # test_image = copy.deepcopy(normalised_CT_lsf[cylinder_position_in_centre_of_slice[1] - roi_length:cylinder_position_in_centre_of_slice[1] + roi_length, cylinder_position_in_centre_of_slice[0] - roi_length:cylinder_position_in_centre_of_slice[0] + roi_length]);
-
-
-    #
-    # normalised_simulated_sinogram.shape = (normalised_simulated_sinogram.size // normalised_simulated_sinogram.shape[2], normalised_simulated_sinogram.shape[2]);
-    #
-    # SSIM_sinogram = ssim(normalised_simulated_sinogram, normalised_reference_sinogram, data_range=normalised_reference_sinogram.max() - normalised_reference_sinogram.min())
-
-    # Reconstruct the corresponding CT slice
-#     theta = theta / 180.0 * math.pi;
-#     rot_center = int(simulated_sinogram.shape[2]/2);
-#     reconstruction_tomopy = tomopy.recon(simulated_sinogram, theta, center=rot_center, algorithm="gridrec", sinogram_order=False);
-
-
-
-
-
-    # simulated_sinogram.shape = (simulated_sinogram.size // simulated_sinogram.shape[2], simulated_sinogram.shape[2]);
-    # CT_lsf = iradon(simulated_sinogram.T, theta=theta, circle=True);
-
-
-    # offset = min(np.min(CT_lsf), np.min(reference_CT));
-    #
-    # reconstruction_CT_lsf = CT_lsf - offset;
-    # reference_CT = reference_CT - offset;
-    # reconstruction_CT_lsf += 0.5;
-    # reference_CT += 0.5;
-    #
-    # reconstruction_CT_lsf = np.log(reconstruction_CT_lsf);
-    # reference_CT = np.log(reference_CT);
-    #
-    # normalised_simulated_CT = (reconstruction_CT_lsf - reconstruction_CT_lsf.mean()) / reconstruction_CT_lsf.std();
-    # temp_reference_CT = (reference_CT - reference_CT.mean()) / reference_CT.std();
-    #
-    # MAE_CT = np.mean(np.abs(np.subtract(reference_CT.flatten(), CT_lsf.flatten())));
-    # ZNCC_CT = np.mean(np.multiply(normalised_reference_CT.flatten(), normalised_CT_lsf.flatten()));
-    # SSIM_CT = ssim(normalised_simulated_CT, temp_reference_CT, data_range=temp_reference_CT.max() - temp_reference_CT.min())
-    #
-    #
-    #
-    # index = np.nonzero(core_mask);
-    # diff_core = math.pow(np.mean(reference_image[index]) - np.mean(test_image[index]), 2);
-    #
-    # index = np.nonzero(fibre_mask);
-    # diff_fibre = math.pow(np.mean(reference_image[index]) - np.mean(test_image[index]), 2);
-    #
-    # index = np.nonzero(matrix_mask);
-    # diff_matrix = math.pow(np.mean(reference_image[index]) - np.mean(test_image[index]), 2);
-    #
-    #
-    #
-
-
-    # MAE_fibre = np.mean(np.abs(np.subtract(reference_image.flatten(), test_image.flatten())));
-
-
-    # SSIM_fibre = ssim(reference_image, test_image, data_range=reference_image.max() - reference_image.min())
-
-    fitness = MAE_sinogram;
-    # fitness = MAE_fibre;
-    # fitness = MAE_CT;
-    #fitness = 1 / (ZNCC_CT + 1);
-
-    if best_fitness > fitness:
-        best_fitness = fitness;
-
-        simulated_sinogram.shape = (simulated_sinogram.size // simulated_sinogram.shape[2], simulated_sinogram.shape[2]);
-        CT_lsf = iradon(simulated_sinogram.T, theta=theta, circle=True);
-        normalised_CT_lsf = (CT_lsf - CT_lsf.mean()) / CT_lsf.std();
-
-        reference_image = copy.deepcopy(reference_CT[cylinder_position_in_centre_of_slice[1] - roi_length:cylinder_position_in_centre_of_slice[1] + roi_length, cylinder_position_in_centre_of_slice[0] - roi_length:cylinder_position_in_centre_of_slice[0] + roi_length]);
-        test_image = copy.deepcopy(CT_lsf[cylinder_position_in_centre_of_slice[1] - roi_length:cylinder_position_in_centre_of_slice[1] + roi_length, cylinder_position_in_centre_of_slice[0] - roi_length:cylinder_position_in_centre_of_slice[0] + roi_length]);
-
-        volume = sitk.GetImageFromArray(CT_lsf);
-        volume.SetSpacing([pixel_spacing_in_mm, pixel_spacing_in_mm, pixel_spacing_in_mm]);
-        sitk.WriteImage(volume, output_directory + "/reconstruction_CT_laplacian-lsf_" + str(lsf_id) + ".mha", useCompression=True);
-
-        volume = sitk.GetImageFromArray(CT_lsf[cylinder_position_in_centre_of_slice[1] - roi_length:cylinder_position_in_centre_of_slice[1] + roi_length,
-                                        cylinder_position_in_centre_of_slice[0] - roi_length:cylinder_position_in_centre_of_slice[0] + roi_length]);
-        volume.SetSpacing([pixel_spacing_in_mm, pixel_spacing_in_mm, pixel_spacing_in_mm]);
-        sitk.WriteImage(volume, output_directory + "/reconstruction_CT_laplacian-lsf_fibre_centre_" + str(lsf_id) + ".mha", useCompression=True);
-
-        comp_equalized = compare_images(reference_image, test_image, method='checkerboard');
-        volume = sitk.GetImageFromArray(comp_equalized)
-        sitk.WriteImage(volume, output_directory + "/laplacian-LSF_comp_fibre_" + str(lsf_id) + ".mha", useCompression=True);
-
-        comp_equalized -= np.min(comp_equalized);
-        comp_equalized /= np.max(comp_equalized);
-        comp_equalized *= 255;
-        comp_equalized = np.array(comp_equalized, dtype=np.uint8);
-        io.imsave(output_directory + "/laplacian-LSF_comp_fibre_" + str(lsf_id) + ".png", comp_equalized);
-
-        comp_equalized = compare_images(reference_CT, CT_lsf, method='checkerboard');
-        volume = sitk.GetImageFromArray(comp_equalized)
-        sitk.WriteImage(volume, output_directory + "/laplacian-LSF_comp_slice_" + str(lsf_id) + ".mha", useCompression=True);
-
-        comp_equalized -= np.min(comp_equalized);
-        comp_equalized /= np.max(comp_equalized);
-        comp_equalized *= 255;
-        comp_equalized = np.array(comp_equalized, dtype=np.uint8);
-        io.imsave(output_directory + "/laplacian-LSF_comp_slice_" + str(lsf_id) + ".png", comp_equalized);
-
-        print("***", x[0], x[1], x[2], x[3], x[4], x[5], x[6], x[7], x[8], x[9], x[10], x[11], fitness);
-
-        lsf_id += 1;
-
-
-    # reference_image = (reference_image - reference_image.mean()) / reference_image.std();
-    # test_image = (test_image - test_image.mean()) / test_image.std();
-    # ZNCC_fibre = np.mean(np.multiply(reference_image.flatten(), test_image.flatten()));
-    print("IND", x[0], x[1], x[2], x[3], x[4], x[5], x[6], x[7], x[8], x[9], x[10], x[11], x[12], fitness);
-    '''
-    return MAE;
+    if use_sinogram:
+        return metrics(reference_sinogram, simulated_sinogram);
+    else:
+        return metrics(reference_normalised_projections, normalised_projections);
 
 fitness_noise_counter = 0;
 def fitnessFunctionNoise(x):
