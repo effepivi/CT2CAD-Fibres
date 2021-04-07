@@ -7,6 +7,11 @@ import skimage.io as io
 
 from scipy import ndimage
 
+from sklearn.metrics import mean_absolute_error
+from sklearn.metrics import mean_squared_error
+from skimage.metrics import structural_similarity as ssim
+#from sklearn.metrics import mean_absolute_percentage_error
+
 import SimpleITK as sitk
 import cv2
 
@@ -47,25 +52,38 @@ metrics_function = "MAE"
 
 def metrics(ref, test):
 
-    if use_normalisation:
-        normalised_ref  = ( ref -  ref.mean()) /  ref.std();
-        normalised_test = (test - test.mean()) / test.std();
-    else:
-       normalised_ref = ref;
-       normalised_test = test;
-       
+    normalised_ref = ref.flatten();
+    normalised_test = test.flatten();
+
+    if use_normalisation or metrics_function == "ZNCC":
+        normalised_ref  -= normalised_ref.mean();
+        normalised_test -= normalised_test.mean();
+        normalised_ref  /= normalised_ref.std();
+        normalised_test /= normalised_test.std();
+
+
     # Mean absolute error
     if metrics_function == "MAE":
-        return np.mean(np.abs(np.subtract(normalised_ref.flatten(), normalised_test.flatten())));
+        return mean_absolute_error(normalised_ref, normalised_test);
     # RMSE
     elif metrics_function == "RMSE":
-        return math.sqrt(np.mean(np.square(np.subtract(normalised_ref.flatten(), normalised_test.flatten()))));
+        return math.sqrt(mean_squared_error(normalised_ref, normalised_test));
     # Mean relative error
-    elif metrics_function == "MRE":
-        return np.mean(np.abs(np.divide(np.subtract(normalised_ref.flatten(), normalised_test.flatten()), normalised_ref.flatten())));
+    elif metrics_function == "MRE" or metrics_function == "MAPE":
+
+        # Prevent division by zero
+        denominator = np.abs(np.subtract(normalised_ref, normalised_test)) + 1e-6;
+        divisor     = np.abs(normalised_ref) + 1e-6;
+
+        return np.mean(np.divide(denominator, divisor));
+    elif metrics_function == "SSIM" or metrics_function == "DSSIM":
+        return (1.0 - ssim(normalised_ref, normalised_test,
+                  data_range=normalised_ref.max() - normalised_ref.min())) / 2.0;
+    elif metrics_function == "ZNCC":
+        return (1.0 - np.mean(np.multiply(normalised_ref, normalised_test))) / 2.0;
     else:
         raise "Unknown metrics";
-    
+
 def createTargetFromRawSinogram(fname):
     """This function read the binary file fname. This file contains
     the projections after flat-field correction.
@@ -510,7 +528,7 @@ def simulateSinogram(sigma_set = None, k_set = None, name_set = None):
     return simulated_sinogram, normalised_projections, raw_projections_in_keV;
 
 
-    
+
 def fitnessFunctionCube(x):
     global best_fitness;
     global matrix_id;
@@ -531,7 +549,7 @@ def fitnessFunctionCube(x):
     simulated_sinogram, normalised_projections, raw_projections_in_keV = simulateSinogram();
 
     # return metrics(normalised_reference_sinogram, normalised_simulated_sinogram);
-    
+
     if use_sinogram:
         return metrics(reference_sinogram, simulated_sinogram);
     else:
@@ -695,8 +713,9 @@ def fitnessFunctionLaplacian(x):
     k_fibre = x[3];
     sigma_matrix = x[4];
     k_matrix = x[5];
-    fibre_radius = x[6];
-
+    core_radius = x[6];
+    fibre_radius = x[7];
+    
     # Load the matrix
     setMatrix(matrix_geometry_parameters);
 
@@ -710,7 +729,6 @@ def fitnessFunctionLaplacian(x):
     map = (normalised_projections + bias) * gain;
     map[map < 0] = 0;
     noise_map = np.random.poisson(map);
-
     normalised_projections += scale * noise_map;
     simulated_sinogram = computeSinogramFromFlatField(normalised_projections);
 

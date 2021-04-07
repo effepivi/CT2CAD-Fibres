@@ -42,7 +42,7 @@ def processCmdLine():
     parser.add_argument('--input', help='Sinogram file', nargs=1, type=str, required=True);
     parser.add_argument('--output', help='Output dir', nargs=1, type=str, required=True);
     parser.add_argument('--metrics', help='MAE, RMSE, or MRE', nargs=1, type=str, required=True);
-    
+
     parser.add_argument('--normalisation', dest='normalisation', action='store_true')
     parser.add_argument('--no-normalisation', dest='normalisation', action='store_false')
     parser.set_defaults(normalisation=True)
@@ -50,7 +50,7 @@ def processCmdLine():
     parser.add_argument('--sinogram', dest='sinogram', action='store_true')
     parser.add_argument('--projections', dest='sinogram', action='store_false')
     parser.set_defaults(sinogram=True)
-    
+
     return parser.parse_args()
 
 
@@ -301,30 +301,43 @@ np.savetxt(output_directory + "/LSF_original.txt", Simulation.lsf_kernel);
 
 Simulation.use_fibres = False;
 
-
 # The registration has already been performed. Load the results.
 if os.path.isfile(output_directory + "/cube1.dat"):
     Simulation.matrix_geometry_parameters = np.loadtxt(output_directory + "/cube1.dat");
 # Perform the registration using CMA-ES
 else:
-    start_time = time.time()
+    ZNCC_CT=0.0;
 
-    Simulation.best_fitness = sys.float_info.max;
-    matrix_id = 0;
+    # Restart if the ZNCC is too low
+    while ZNCC_CT < 0.40:
+        print("OPTIMISE THE CUBE FROM SCRATCH")
+        start_time = time.time()
 
-    opts = cma.CMAOptions()
-    opts.set('tolfun', 1e-4);
-    opts['tolx'] = 1e-4;
-    opts['bounds'] = [5*[-0.5], 5*[0.5]];
-    #opts['seed'] = 123456789;
-    # opts['maxiter'] = 5;
+        Simulation.best_fitness = sys.float_info.max;
+        matrix_id = 0;
 
-    es = cma.CMAEvolutionStrategy(5 * [0], 0.5, opts);
-    es.optimize(Simulation.fitnessFunctionCube);
+        opts = cma.CMAOptions()
+        opts.set('tolfun', 1e-4);
+        opts['tolx'] = 1e-4;
+        opts['bounds'] = [5*[-0.5], 5*[0.5]];
+        #opts['seed'] = 123456789;
+        # opts['maxiter'] = 5;
 
-    Simulation.matrix_geometry_parameters = copy.deepcopy(es.result.xbest); # [-0.12174177  0.07941929 -0.3949529  -0.18708068 -0.23998638]
-    np.savetxt(output_directory + "/cube1.dat", Simulation.matrix_geometry_parameters, header='x,y,rotation_angle,w,h');
-    elapsed_time = time.time() - start_time
+        es = cma.CMAEvolutionStrategy([0.0, 0.0, 0.0, 0.256835938, 0.232903226], 0.5, opts);
+        es.optimize(Simulation.fitnessFunctionCube);
+
+        Simulation.matrix_geometry_parameters = copy.deepcopy(es.result.xbest); # [-0.12174177  0.07941929 -0.3949529  -0.18708068 -0.23998638]
+        np.savetxt(output_directory + "/cube1.dat", Simulation.matrix_geometry_parameters, header='x,y,rotation_angle,w,h');
+        elapsed_time = time.time() - start_time
+        
+        # Apply the result of the registration
+        Simulation.setMatrix(Simulation.matrix_geometry_parameters);
+        
+        # Simulate the corresponding CT aquisition
+        simulated_sinogram, normalised_projections, raw_projections_in_keV = Simulation.simulateSinogram();
+        
+        # Store the corresponding results on the disk
+        ZNCC_CT, CT_slice_from_simulated_sinogram = Simulation.reconstructAndStoreResults(simulated_sinogram, output_directory + "/matrix1");
     print("CUBE1", elapsed_time);
 
 # Apply the result of the registration
@@ -346,7 +359,7 @@ if not DEBUG_FLAG:
     print("Matrix1 CT ZNCC:", ZNCC_CT);
 
 
-exit()
+
 
 ################################################################################
 ##### FIND CIRCLES
@@ -385,6 +398,7 @@ if os.path.isfile(output_directory + "/fibre_radius1.dat"):
     Simulation.fibre_radius = temp[1];
 # Perform the registration using CMA-ES
 else:
+    print("OPTIMISE THE RADII AFTER OPTIMISING THE CUBE FROM SCRATCH");
     ratio = Simulation.core_radius / Simulation.fibre_radius;
 
     x0 = [Simulation.fibre_radius, ratio];
@@ -413,9 +427,11 @@ else:
 Simulation.setMatrix(Simulation.matrix_geometry_parameters);
 Simulation.setFibres(Simulation.centroid_set);
 
+# Simulate the corresponding CT aquisition
+simulated_sinogram, normalised_projections, raw_projections_in_keV = Simulation.simulateSinogram();
+ZNCC_CT, CT_slice_from_simulated_sinogram = Simulation.reconstructAndStoreResults(simulated_sinogram, output_directory + "/fibres1");
+
 if not DEBUG_FLAG:
-    # Simulate the corresponding CT aquisition
-    simulated_sinogram, normalised_projections, raw_projections_in_keV = Simulation.simulateSinogram();
 
     temp = copy.deepcopy(normalised_projections);
     temp.shape = reference_normalised_projections.shape
@@ -424,68 +440,18 @@ if not DEBUG_FLAG:
     sitk.WriteImage(volume, output_directory + "/Fibres1-normalised_projections.mha", useCompression=True);
 
     # Store the corresponding results on the disk
-    ZNCC_CT, CT_slice_from_simulated_sinogram = Simulation.reconstructAndStoreResults(simulated_sinogram, output_directory + "/fibres1");
+
     print("Fibres1 params:", Simulation.core_radius, Simulation.fibre_radius);
     print("Fibres1 CT ZNCC:", ZNCC_CT);
-
-    # Find the fibre in the centre of the reference and simulated slices
-    test_fibre_in_centre = np.array(copy.deepcopy(CT_slice_from_simulated_sinogram[Simulation.cylinder_position_in_centre_of_slice[1] - Simulation.roi_length:Simulation.cylinder_position_in_centre_of_slice[1] + Simulation.roi_length, Simulation.cylinder_position_in_centre_of_slice[0] - Simulation.roi_length:Simulation.cylinder_position_in_centre_of_slice[0] + Simulation.roi_length]));
-    reference_fibre_in_centre = np.array(copy.deepcopy(Simulation.reference_CT[Simulation.cylinder_position_in_centre_of_slice[1] - Simulation.roi_length:Simulation.cylinder_position_in_centre_of_slice[1] + Simulation.roi_length, Simulation.cylinder_position_in_centre_of_slice[0] - Simulation.roi_length:Simulation.cylinder_position_in_centre_of_slice[0] + Simulation.roi_length]));
-    Simulation.printMuStatistics("Fibres1", reference_fibre_in_centre, test_fibre_in_centre, core_mask, fibre_mask, matrix_mask);
-
-################################################################################
-##### OPTIMISE THE CUBE AGAIN, BUT THIS TIME TURNING ON THE CYLINDERS
-################################################################################
-
-Simulation.use_fibres = True;
-# The registration has already been performed. Load the results.
-if os.path.isfile(output_directory + "/cube2.dat"):
-    Simulation.matrix_geometry_parameters = np.loadtxt(output_directory + "/cube2.dat");
-# Perform the registration using CMA-ES
-else:
-    start_time = time.time()
-
-    Simulation.best_fitness = sys.float_info.max;
-    matrix_id = 0;
-
-    opts = cma.CMAOptions()
-    opts.set('tolfun', 1e-4);
-    opts['tolx'] = 1e-4;
-    opts['bounds'] = [5*[-0.5], 5*[0.5]];
-    #opts['seed'] = 123456789;
-    # opts['maxiter'] = 5;
-
-    es = cma.CMAEvolutionStrategy(Simulation.matrix_geometry_parameters, 0.125, opts);
-    es.optimize(Simulation.fitnessFunctionCube);
-
-    Simulation.matrix_geometry_parameters = copy.deepcopy(es.result.xbest); # [-0.12174177  0.07941929 -0.3949529  -0.18708068 -0.23998638]
-    np.savetxt(output_directory + "/cube2.dat", Simulation.matrix_geometry_parameters, header='x,y,rotation_angle,w,h');
-    elapsed_time = time.time() - start_time
-    print("CUBE2", elapsed_time);
-
-
-# Apply the result of the registration
-Simulation.setMatrix(Simulation.matrix_geometry_parameters);
-Simulation.setFibres(Simulation.centroid_set);
-
-# Simulate the corresponding CT aquisition
-simulated_sinogram, normalised_projections, raw_projections_in_keV = Simulation.simulateSinogram();
-
-temp = copy.deepcopy(normalised_projections);
-temp.shape = reference_normalised_projections.shape
-
-volume = sitk.GetImageFromArray(temp);
-sitk.WriteImage(volume, output_directory + "/matrix2-normalised_projections.mha", useCompression=True);
-
-# Store the corresponding results on the disk
-ZNCC_CT, CT_slice_from_simulated_sinogram = Simulation.reconstructAndStoreResults(simulated_sinogram, output_directory + "/matrix2");
-print("Matrix2 params:", Simulation.matrix_geometry_parameters);
-print("Matrix2 CT ZNCC:", ZNCC_CT);
 
 # Find the fibre in the centre of the reference and simulated slices
 test_fibre_in_centre = np.array(copy.deepcopy(CT_slice_from_simulated_sinogram[Simulation.cylinder_position_in_centre_of_slice[1] - Simulation.roi_length:Simulation.cylinder_position_in_centre_of_slice[1] + Simulation.roi_length, Simulation.cylinder_position_in_centre_of_slice[0] - Simulation.roi_length:Simulation.cylinder_position_in_centre_of_slice[0] + Simulation.roi_length]));
 reference_fibre_in_centre = np.array(copy.deepcopy(Simulation.reference_CT[Simulation.cylinder_position_in_centre_of_slice[1] - Simulation.roi_length:Simulation.cylinder_position_in_centre_of_slice[1] + Simulation.roi_length, Simulation.cylinder_position_in_centre_of_slice[0] - Simulation.roi_length:Simulation.cylinder_position_in_centre_of_slice[0] + Simulation.roi_length]));
-Simulation.printMuStatistics("Matrix2", reference_fibre_in_centre, test_fibre_in_centre, core_mask, fibre_mask, matrix_mask);
+Simulation.printMuStatistics("Fibres1", reference_fibre_in_centre, test_fibre_in_centre, core_mask, fibre_mask, matrix_mask);
+
+
+
+
 
 ################################################################################
 ##### RECENTRE THE CYLINDERS
@@ -533,6 +499,7 @@ if not DEBUG_FLAG:
     test_fibre_in_centre = np.array(copy.deepcopy(CT_slice_from_simulated_sinogram[Simulation.cylinder_position_in_centre_of_slice[1] - Simulation.roi_length:Simulation.cylinder_position_in_centre_of_slice[1] + Simulation.roi_length, Simulation.cylinder_position_in_centre_of_slice[0] - Simulation.roi_length:Simulation.cylinder_position_in_centre_of_slice[0] + Simulation.roi_length]));
     reference_fibre_in_centre = np.array(copy.deepcopy(Simulation.reference_CT[Simulation.cylinder_position_in_centre_of_slice[1] - Simulation.roi_length:Simulation.cylinder_position_in_centre_of_slice[1] + Simulation.roi_length, Simulation.cylinder_position_in_centre_of_slice[0] - Simulation.roi_length:Simulation.cylinder_position_in_centre_of_slice[0] + Simulation.roi_length]));
     Simulation.printMuStatistics("Fibres2", reference_fibre_in_centre, test_fibre_in_centre, core_mask, fibre_mask, matrix_mask);
+
 
 ################################################################################
 ##### OPTIMISE THE RADII AFTER RECENTRING THE CYLINDERS
@@ -745,7 +712,9 @@ if os.path.isfile(output_directory + "/laplacian1.dat"):
     Simulation.k_fibre = temp[3];
     Simulation.sigma_matrix = temp[4];
     Simulation.k_matrix = temp[5];
-    Simulation.fibre_radius = temp[6];
+    Simulation.core_radius = temp[6];
+    Simulation.fibre_radius = temp[7];
+    
 # Perform the registration using CMA-ES
 else:
 
@@ -757,9 +726,9 @@ else:
     Simulation.k_fibre = 1000;
     Simulation.k_matrix = 1000.0;
 
-    x0 = [Simulation.sigma_core, Simulation.k_core, Simulation.sigma_fibre, Simulation.k_fibre, Simulation.sigma_matrix, Simulation.k_matrix, Simulation.fibre_radius];
-    bounds = [[0.005, 0.0, 0.005, 0.0, 0.005, 0.0, 0.95 * Simulation.fibre_radius],
-              [10.0, 2000, 2.5, 2000, 2.5, 2000, 1.15 * Simulation.fibre_radius]];
+    x0 = [Simulation.sigma_core, Simulation.k_core, Simulation.sigma_fibre, Simulation.k_fibre, Simulation.sigma_matrix, Simulation.k_matrix, Simulation.core_radius, Simulation.fibre_radius];
+    bounds = [[0.005, 0.0, 0.005, 0.0, 0.005, 0.0, 0.95 * Simulation.core_radius, 0.95 * Simulation.fibre_radius],
+              [10.0, 2000, 2.5, 2000, 2.5, 2000, 1.15 * Simulation.core_radius, 1.15 * Simulation.fibre_radius]];
 
     Simulation.best_fitness = sys.float_info.max;
     laplacian_id = 0;
@@ -770,7 +739,7 @@ else:
     opts['bounds'] = bounds;
     #opts['seed'] = 987654321;
     # opts['maxiter'] = 5;
-    opts['CMA_stds'] = [0.25, 20.25, 0.25, 20.25, 0.25, 20.25, Simulation.fibre_radius * 0.1];
+    opts['CMA_stds'] = [0.25, 20.25, 0.25, 20.25, 0.25, 20.25, Simulation.core_radius * 0.1, Simulation.fibre_radius * 0.1];
 
 
     # IND 2.19746627320312	1.16136683253601	0.763740221230013	249.875214879601	0.503314643902767	38.2390121454358	53.2213098006193	    0.084343959685696	0.992778341956513
@@ -787,9 +756,10 @@ else:
     Simulation.k_fibre = es.result.xbest[3];
     Simulation.sigma_matrix = es.result.xbest[4];
     Simulation.k_matrix = es.result.xbest[5];
-    Simulation.fibre_radius = es.result.xbest[6];
-
-    np.savetxt(output_directory + "/laplacian1.dat", [Simulation.sigma_core, Simulation.k_core, Simulation.sigma_fibre, Simulation.k_fibre, Simulation.sigma_matrix, Simulation.k_matrix, Simulation.fibre_radius], header='sigma_core, k_core, sigma_fibre, k_fibre, sigma_matrix, k_matrix, fibre_radius_in_um');
+    Simulation.core_radius = es.result.xbest[6];
+    Simulation.fibre_radius = es.result.xbest[7];
+    
+    np.savetxt(output_directory + "/laplacian1.dat", [Simulation.sigma_core, Simulation.k_core, Simulation.sigma_fibre, Simulation.k_fibre, Simulation.sigma_matrix, Simulation.k_matrix, Simulation.core_radius, Simulation.fibre_radius], header='sigma_core, k_core, sigma_fibre, k_fibre, sigma_matrix, k_matrix, core_radius_in_um, fibre_radius_in_um');
 
 # Apply the result of the registration
 Simulation.setMatrix(Simulation.matrix_geometry_parameters);
@@ -812,7 +782,7 @@ matrix_mask = ndimage.binary_erosion(matrix_mask).astype(core_mask.dtype);
 np.savetxt(output_directory + "/matrix_mask.txt", matrix_mask);
 
 
-if not DEBUG_FLAG:
+if  DEBUG_FLAG:
     # Simulate the corresponding CT aquisition
     simulated_sinogram, normalised_projections, raw_projections_in_keV = Simulation.simulateSinogram([Simulation.sigma_core, Simulation.sigma_fibre, Simulation.sigma_matrix], [Simulation.k_core, Simulation.k_fibre, Simulation.k_matrix], ["core", "fibre", "matrix"]);
 
@@ -830,7 +800,7 @@ if not DEBUG_FLAG:
 
     # Store the corresponding results on the disk
     ZNCC_CT, CT_slice_from_simulated_sinogram = Simulation.reconstructAndStoreResults(simulated_sinogram, output_directory + "/laplacian1");
-    print("Laplacian1 params:", Simulation.sigma_core, Simulation.sigma_fibre, Simulation.sigma_matrix, Simulation.k_core, Simulation.k_fibre, Simulation.k_matrix, Simulation.fibre_radius);
+    print("Laplacian1 params:", Simulation.sigma_core, Simulation.sigma_fibre, Simulation.sigma_matrix, Simulation.k_core, Simulation.k_fibre, Simulation.k_matrix, Simulation.core_radius, Simulation.fibre_radius);
     print("Laplacian1 CT ZNCC:", ZNCC_CT);
 
     pixel_range = np.linspace(-Simulation.value_range, Simulation.value_range, num=int(Simulation.num_samples), endpoint=True);
@@ -858,54 +828,6 @@ if not DEBUG_FLAG:
 
 
 
-
-################################################################################
-##### RECENTRE THE CYLINDERS
-################################################################################
-
-Simulation.centroid_set = Simulation.refineCentrePositions(Simulation.centroid_set, CT_slice_from_simulated_sinogram);
-
-# Find the position of the fibre that in the most in the centre of the CT slice
-Simulation.findFibreInCentreOfCtSlice();
-
-# Create the binary masks
-reference_fibre_in_centre = np.array(copy.deepcopy(Simulation.reference_CT[Simulation.cylinder_position_in_centre_of_slice[1] - Simulation.roi_length:Simulation.cylinder_position_in_centre_of_slice[1] + Simulation.roi_length, Simulation.cylinder_position_in_centre_of_slice[0] - Simulation.roi_length:Simulation.cylinder_position_in_centre_of_slice[0] + Simulation.roi_length]));
-mask_shape = reference_fibre_in_centre.shape;
-core_mask, fibre_mask, matrix_mask = Simulation.createMasks(mask_shape);
-
-# Save the binary masks
-core_mask = ndimage.binary_erosion(core_mask).astype(core_mask.dtype);
-np.savetxt(output_directory + "/core_mask3.txt", core_mask);
-
-fibre_mask = ndimage.binary_erosion(fibre_mask).astype(core_mask.dtype);
-np.savetxt(output_directory + "/fibre_mask3.txt", fibre_mask);
-
-matrix_mask = ndimage.binary_erosion(matrix_mask).astype(core_mask.dtype);
-np.savetxt(output_directory + "/matrix_mask3.txt", matrix_mask);
-
-# Apply the result of the registration
-Simulation.setMatrix(Simulation.matrix_geometry_parameters);
-Simulation.setFibres(Simulation.centroid_set);
-
-if not DEBUG_FLAG:
-    # Simulate the corresponding CT aquisition
-    simulated_sinogram, normalised_projections, raw_projections_in_keV = Simulation.simulateSinogram([Simulation.sigma_core, Simulation.sigma_fibre, Simulation.sigma_matrix], [Simulation.k_core, Simulation.k_fibre, Simulation.k_matrix], ["core", "fibre", "matrix"]);
-
-    map = (normalised_projections + Simulation.bias) * Simulation.gain;
-    map[map < 0] = 0;
-    noise_map = np.random.poisson(map);
-    normalised_projections += Simulation.scale * noise_map;
-    simulated_sinogram = Simulation.computeSinogramFromFlatField(normalised_projections);
-
-    temp = copy.deepcopy(normalised_projections);
-    temp.shape = reference_normalised_projections.shape
-
-    volume = sitk.GetImageFromArray(temp);
-    sitk.WriteImage(volume, output_directory + "/Fibres4-normalised_projections.mha", useCompression=True);
-
-    # Store the corresponding results on the disk
-    ZNCC_CT, CT_slice_from_simulated_sinogram = Simulation.reconstructAndStoreResults(simulated_sinogram, output_directory + "/fibres4");
-    print("Fibres4 CT ZNCC:", ZNCC_CT);
 
 
 
@@ -1030,7 +952,7 @@ temp.shape = reference_normalised_projections.shape
 volume = sitk.GetImageFromArray(temp);
 sitk.WriteImage(volume, output_directory + "/LSF_optimised-normalised_projections.mha", useCompression=True);
 
-if not DEBUG_FLAG:
+if  DEBUG_FLAG:
 
     # Store the corresponding results on the disk
     ZNCC_CT, CT_slice_from_simulated_sinogram = Simulation.reconstructAndStoreResults(simulated_sinogram, output_directory + "/laplacian-LSF");
