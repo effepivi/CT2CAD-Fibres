@@ -843,7 +843,7 @@ matrix_mask = ndimage.binary_erosion(matrix_mask).astype(core_mask.dtype);
 np.savetxt(output_directory + "/matrix_mask.txt", matrix_mask);
 
 
-if  DEBUG_FLAG:
+if not DEBUG_FLAG:
     # Simulate the corresponding CT aquisition
     simulated_sinogram, normalised_projections, raw_projections_in_keV = Simulation.simulateSinogram([Simulation.sigma_core, Simulation.sigma_fibre, Simulation.sigma_matrix], [Simulation.k_core, Simulation.k_fibre, Simulation.k_matrix], ["core", "fibre", "matrix"]);
 
@@ -1013,7 +1013,7 @@ temp.shape = reference_normalised_projections.shape
 volume = sitk.GetImageFromArray(temp);
 sitk.WriteImage(volume, output_directory + "/LSF_optimised-normalised_projections.mha", useCompression=True);
 
-if  DEBUG_FLAG:
+if not DEBUG_FLAG:
 
     # Store the corresponding results on the disk
     ZNCC_CT, CT_slice_from_simulated_sinogram = Simulation.reconstructAndStoreResults(simulated_sinogram, output_directory + "/laplacian-LSF");
