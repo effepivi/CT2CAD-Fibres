@@ -1,5 +1,0 @@
-Traceback (most recent call last):
-  File "validation1.py", line 719, in <module>
-    imgplot = plt.imshow(comp_equalized, cmap='gray', norm=norm);
-NameError: name 'norm' is not defined
-/var/log/slurm/spool_slurmd/job18751015/slurm_script: line 31: 213801 Segmentation fault      python3 validation1.py --input Tutorial2/sino.raw --output validation/run_SCW_9/
