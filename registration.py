@@ -329,13 +329,13 @@ else:
         Simulation.matrix_geometry_parameters = copy.deepcopy(es.result.xbest); # [-0.12174177  0.07941929 -0.3949529  -0.18708068 -0.23998638]
         np.savetxt(output_directory + "/cube1.dat", Simulation.matrix_geometry_parameters, header='x,y,rotation_angle,w,h');
         elapsed_time = time.time() - start_time
-        
+
         # Apply the result of the registration
         Simulation.setMatrix(Simulation.matrix_geometry_parameters);
-        
+
         # Simulate the corresponding CT aquisition
         simulated_sinogram, normalised_projections, raw_projections_in_keV = Simulation.simulateSinogram();
-        
+
         # Store the corresponding results on the disk
         ZNCC_CT, CT_slice_from_simulated_sinogram = Simulation.reconstructAndStoreResults(simulated_sinogram, output_directory + "/matrix1");
     print("CUBE1", elapsed_time);
@@ -563,6 +563,67 @@ if not DEBUG_FLAG:
 
 
 
+################################################################################
+##### BEAM SPECTRUM
+################################################################################
+
+# The registration has already been performed. Load the results.
+if os.path.isfile(output_directory + "/spectrum.dat"):
+    temp = np.loadtxt(output_directory + "/spectrum.dat");
+
+    # The beam specturm. Here we have a polychromatic beam.
+    Simulation.energy_spectrum = [(33, temp[0], "keV"), (66, temp[1], "keV"), (99, temp[2], "keV")];
+
+# Perform the registration using CMA-ES
+else:
+    ratio = Simulation.core_radius / Simulation.fibre_radius;
+
+    x0 = [0.97, 0.2, 0.1];
+    bounds = [[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]];
+
+    Simulation.best_fitness = sys.float_info.max;
+
+    opts = cma.CMAOptions()
+    opts.set('tolfun', 1e-4);
+    opts['tolx'] = 1e-4;
+    opts['bounds'] = bounds;
+
+    es = cma.CMAEvolutionStrategy(x0, 0.25, opts);
+    es.optimize(Simulation.fitnessHarmonics);
+    elapsed_time = time.time() - start_time
+    print("HARMONICS",elapsed_time);
+
+    total = es.result.xbest[0] + es.result.xbest[1] + es.result.xbest[2];
+    Simulation.energy_spectrum = [(33, es.result.xbest[0] / total, "keV"), (66, es.result.xbest[1] / total, "keV"), (99, es.result.xbest[2] / total, "keV")];
+
+    np.savetxt(output_directory + "/spectrum.dat", [es.result.xbest[0] / total, es.result.xbest[1] / total, es.result.xbest[2] / total], header='weight of main energy,weight of first order harmonics,weight of second order harmonics');
+
+# Apply the result of the registration
+gvxr.resetBeamSpectrum();
+for energy, percentage, unit in Simulation.energy_spectrum:
+    gvxr.addEnergyBinToSpectrum(energy, unit, percentage);
+
+# Simulate the corresponding CT aquisition
+simulated_sinogram, normalised_projections, raw_projections_in_keV = Simulation.simulateSinogram();
+
+if not DEBUG_FLAG:
+
+    # Store the corresponding results on the disk
+    ZNCC_CT, CT_slice_from_simulated_sinogram = Simulation.reconstructAndStoreResults(simulated_sinogram, output_directory + "/fibres3");
+    print("Harmonics params:", es.result.xbest[0] / total, es.result.xbest[1] / total, es.result.xbest[2] / total);
+    print("Harmonics CT ZNCC:", ZNCC_CT);
+
+    temp = copy.deepcopy(normalised_projections);
+    temp.shape = reference_normalised_projections.shape
+
+    volume = sitk.GetImageFromArray(temp);
+    sitk.WriteImage(volume, output_directory + "/harmonics-normalised_projections.mha", useCompression=True);
+
+    # Find the fibre in the centre of the reference and simulated slices
+    test_fibre_in_centre = np.array(copy.deepcopy(CT_slice_from_simulated_sinogram[Simulation.cylinder_position_in_centre_of_slice[1] - Simulation.roi_length:Simulation.cylinder_position_in_centre_of_slice[1] + Simulation.roi_length, Simulation.cylinder_position_in_centre_of_slice[0] - Simulation.roi_length:Simulation.cylinder_position_in_centre_of_slice[0] + Simulation.roi_length]));
+    reference_fibre_in_centre = np.array(copy.deepcopy(Simulation.reference_CT[Simulation.cylinder_position_in_centre_of_slice[1] - Simulation.roi_length:Simulation.cylinder_position_in_centre_of_slice[1] + Simulation.roi_length, Simulation.cylinder_position_in_centre_of_slice[0] - Simulation.roi_length:Simulation.cylinder_position_in_centre_of_slice[0] + Simulation.roi_length]));
+    Simulation.printMuStatistics("Harmonics", reference_fibre_in_centre, test_fibre_in_centre, core_mask, fibre_mask, matrix_mask);
+
 
 
 
@@ -714,7 +775,7 @@ if os.path.isfile(output_directory + "/laplacian1.dat"):
     Simulation.k_matrix = temp[5];
     Simulation.core_radius = temp[6];
     Simulation.fibre_radius = temp[7];
-    
+
 # Perform the registration using CMA-ES
 else:
 
@@ -758,7 +819,7 @@ else:
     Simulation.k_matrix = es.result.xbest[5];
     Simulation.core_radius = es.result.xbest[6];
     Simulation.fibre_radius = es.result.xbest[7];
-    
+
     np.savetxt(output_directory + "/laplacian1.dat", [Simulation.sigma_core, Simulation.k_core, Simulation.sigma_fibre, Simulation.k_fibre, Simulation.sigma_matrix, Simulation.k_matrix, Simulation.core_radius, Simulation.fibre_radius], header='sigma_core, k_core, sigma_fibre, k_fibre, sigma_matrix, k_matrix, core_radius_in_um, fibre_radius_in_um');
 
 # Apply the result of the registration

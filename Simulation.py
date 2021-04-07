@@ -50,6 +50,9 @@ f2 = 1.0;
 use_normalisation = False;
 metrics_function = "MAE"
 
+# The beam specturm. Here we have a polychromatic beam, with 97% of the photons at 33 keV, 2% at 66 keV and 1% at 99 keV.
+energy_spectrum = [(33, 0.97, "keV"), (66, 0.02, "keV"), (99, 0.01, "keV")];
+
 def metrics(ref, test):
 
     normalised_ref = ref.flatten();
@@ -134,6 +137,7 @@ def initGVXR():
     global fibre_density;
 
     global a2, b2, c2, d2, e2, f2, lsf_kernel;
+    global energy_spectrum;
 
     # Create an OpenGL context, here using EGL, i.e. a windowless context
     gvxr.createWindow(0, 1, "EGL");
@@ -150,9 +154,6 @@ def initGVXR():
     gvxr.setDetectorUpVector(0, 1, 0);
     gvxr.setDetectorNumberOfPixels(detector_width_in_pixels, detector_height_in_pixels);
     gvxr.setDetectorPixelSize(pixel_spacing_in_micrometre, pixel_spacing_in_micrometre, "micrometer");
-
-    # The beam specturm. Here we have a polychromatic beam, with 97% of the photons at 33 keV, 2% at 66 keV and 1% at 99 keV.
-    energy_spectrum = [(33, 0.97, "keV"), (66, 0.02, "keV"), (99, 0.01, "keV")];
 
     for energy, percentage, unit in energy_spectrum:
         gvxr.addEnergyBinToSpectrum(energy, unit, percentage);
@@ -715,7 +716,7 @@ def fitnessFunctionLaplacian(x):
     k_matrix = x[5];
     core_radius = x[6];
     fibre_radius = x[7];
-    
+
     # Load the matrix
     setMatrix(matrix_geometry_parameters);
 
@@ -731,6 +732,36 @@ def fitnessFunctionLaplacian(x):
     noise_map = np.random.poisson(map);
     normalised_projections += scale * noise_map;
     simulated_sinogram = computeSinogramFromFlatField(normalised_projections);
+
+    if use_sinogram:
+        return metrics(reference_sinogram, simulated_sinogram);
+    else:
+        return metrics(reference_normalised_projections, normalised_projections);
+
+
+def fitnessHarmonics(x):
+
+    global energy_spectrum ;
+
+    energy_33_keV = x[0];
+    first_order_harmonics = x[1];
+    second_order_harmonics = x[2];
+
+    # Normalise the beam spectrum
+    total = energy_33_keV + first_order_harmonics + second_order_harmonics;
+    energy_33_keV /= total;
+    first_order_harmonics /= total;
+    second_order_harmonics /= total;
+
+    # The beam specturm. Here we have a polychromatic beam.
+    gvxr.resetBeamSpectrum();
+    energy_spectrum = [(33, energy_33_keV, "keV"), (66, first_order_harmonics, "keV"), (99, second_order_harmonics, "keV")];
+
+    for energy, percentage, unit in energy_spectrum:
+        gvxr.addEnergyBinToSpectrum(energy, unit, percentage);
+
+    # Simulate a sinogram
+    simulated_sinogram, normalised_projections, raw_projections_in_keV = simulateSinogram();
 
     if use_sinogram:
         return metrics(reference_sinogram, simulated_sinogram);
