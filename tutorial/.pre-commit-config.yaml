@@ -1,0 +1,9 @@
+- repo: https://github.com/nbQA-dev/nbQA
+  rev: 0.8.0
+  hooks:
+    - id: nbqa-black
+      args: [--nbqa-mutate]
+    - id: nbqa-pyupgrade
+      args: [--nbqa-mutate, --py36-plus]
+    - id: nbqa-isort
+      args: [--nbqa-mutate]
