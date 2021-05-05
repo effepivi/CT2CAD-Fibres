@@ -244,11 +244,11 @@ $E$ and $N$ the energy in eV and the number of photons at that energy respective
 $i$ the $i$-th material being scanned, $\mu_i$ its linear attenuation coefficient in cm$^{-1}$ at Energy $E$, and
 $\Delta_i$ the path length of the ray crossing the $i$-th material from the X-ray source to the detector.
 
-$$I_0 = E \times N$$
+<img src="https://render.githubusercontent.com/render/math?math=I_0 = E \times N" />
 
 `reference_normalised_projections` above corresponds to the data loaded from the binary file. It corresponds to $\frac{I}{I_0}$, i.e. the flat-field correction has already been performed. It is now necessary to linearise the transmission tomography data using:
 
-$$-\ln\left(\frac{I}{I_0}\right)$$
+<img src="https://render.githubusercontent.com/render/math?math=-\ln\left(\frac{I}{I_0}\right)" />
 
 This new image corresponds to the Radon transform, known as sinogram, of the scanned object in these experimental conditions. Once this is done, we divide the pixels of the sinogram by $\Delta_x$, which is egal to the spacing between two successive pixels along the horizontal axis.
 
@@ -378,7 +378,7 @@ plt.savefig('plots/reference_image_in_mu.png');
 
 Zero-mean, unit-variance normalisation is applied to use the reference images in objective functions and perform the registration. Note that it is called standardisation (or Z-score Normalisation) in machine learning. It is computed as follows:
 
-$$I' = \frac{I - \bar{I}}{\sigma}$$
+<img src="https://render.githubusercontent.com/render/math?math=I' = \frac{I - \bar{I}}{\sigma}" />
 
 Where $I'$ is the image after the original image $I$ has been normalised, $\bar{I}$ is the average pixel value of $I$, and $\sigma$ is its standard deviation. We define a function to apply this:
 
@@ -928,13 +928,13 @@ Because the data suffers from a fixed-pattern noise in X-ray imaging in
 actual experiments, it is necessary to perform the flat-field correction of
 the raw projections using:
 
-$$I' = \frac{I - D}{F - D}$$
+<img src="https://render.githubusercontent.com/render/math?math=I' = \frac{I - D}{F - D}" />
 
 where $F$ (flat fields) and $D$ (dark fields) are projection images without sample and acquired with and without the X-ray beam turned on respectively. $I'$ corresponds to `corrected_projections` in the function below.
 
 Note that in our example, `raw_projections_in_keV`, `flat_field_image` and `dark_field_image` are in keV whereas `corrected_projections` does not have any unit:
 
-$$0 \leq raw\_projections\_in\_keV \leq  \sum_E N_0(E) \times E\\0 \leq corrected\_projections \leq 1$$
+<img src="https://render.githubusercontent.com/render/math?math=0 \leq raw\_projections\_in\_keV \leq  \sum_E N_0(E) \times E\\0 \leq corrected\_projections \leq 1" />
 
 We define a new function to compute the flat-field correction.
 
