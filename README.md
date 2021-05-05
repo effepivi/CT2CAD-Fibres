@@ -1697,7 +1697,7 @@ if not os.path.exists("plots/fibre1_registration.gif"):
                 'plots/fibre1_registration.gif');
 ```
 
-![Animation of the registration (GIF file)](plots/fibre1_registration.gif)
+![Animation of the registration (GIF file)](tutorial/plots/fibre1_registration.gif)
 
 ### Apply the result of the registration
 
