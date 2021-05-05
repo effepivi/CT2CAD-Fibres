@@ -2,7 +2,7 @@
 
 This demo aims to demonstrate the use of [gVirtualXRay](http://gvirtualxray.sourceforge.net/) and mathematical optimisation to register polygon meshes onto X-ray microtomography (micro-CT) scans of a tungsten fibre. Below is an example of CT slice.
  
-![The fibre.](./scanned_object.png)
+![The fibre.](../doc/scanned_object.png)
 
 Our simulations include beam-hardening due to polychromatism and they take into account the response of the detector.
 
@@ -365,7 +365,7 @@ gvxr.setWindowSize(512, 512);
 
 We set the parameters of the X-ray detector (flat pannel), e.g. number of pixels, pixel, spacing, position and orientation:
 
-![3D scene to be simulated using gVirtualXray](./3d_scene.png)
+![3D scene to be simulated using gVirtualXray](../doc/3d_scene.png)
 
 
 ```python
@@ -1676,7 +1676,7 @@ print("ZNCC radii registration 1:",
 
 The 3D view of the registration looks like:
 
-![3D view](./3d-view.png)
+![3D view](../doc/3d-view.png)
 
 ## Recentre each core/fibre
 
