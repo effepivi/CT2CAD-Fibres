@@ -237,7 +237,7 @@ In the literature, a projection is often modelled as follows:
 
 <!--$$P = \ln\left(\frac{I_0}{I}\right) = -\ln\left(\frac{I}{I_0}\right) = \sum_n \mu(n) \Delta_x$$-->
 
-<img src="https://render.githubusercontent.com/render/math?math=I = \sum_i E \times N \times \text{e}^{-\sum_i(\mu_i \times \Delta_i)}</img>
+<img src="https://render.githubusercontent.com/render/math?math=I = \sum_i E \times N \times \text{e}^{-\sum_i(\mu_i \times \Delta_i)}" />
 
 with $I$ the raw X-ray projection, and with the sample and with the the X-ray beam turned on;
 $E$ and $N$ the energy in eV and the number of photons at that energy respectively;
