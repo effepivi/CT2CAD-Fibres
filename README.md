@@ -7,7 +7,7 @@
 This demo aims to demonstrate how to register polygon meshes onto X-ray microtomography (micro-CT) scans of a tungsten fibre. The code relies on two building blocks:
 
 1.  A global optimisation algorithm. We use the [CMA-ES (Covariance Matrix Adaptation Evolution Strategy)](http://cma.gforge.inria.fr/http://cma.gforge.inria.fr/). It is an evolutionary algorithm for difficult non-linear non-convex optimisation problems.
-2.  A fast X-ray simulation toolkit. We use [gVirtualXRay](http://gvirtualxray.sourceforge.net/)[gVirtualXRay](http://gvirtualxray.sourceforge.net/). It is a framework supporting many modern programming languages to generate realistic X-ray images from polygon meshes (triangles or tetrahedrons) on the graphics processor unit (GPU).
+2.  A fast X-ray simulation toolkit. We use [gVirtualXRay](http://gvirtualxray.sourceforge.net/). It is a framework supporting many modern programming languages to generate realistic X-ray images from polygon meshes (triangles or tetrahedrons) on the graphics processor unit (GPU).
 
 Below is an example of CT slice from an experiment we carried out at the [European Synchrotron Radiation Facility (ESRF)European Synchrotron Radiation Facility (ESRF)](https://www.esrf.fr/https://www.esrf.fr/).
 
@@ -62,7 +62,7 @@ We need to import a few libraries (called packages in Python). We use:
 - `skimage`: comparing the reference CT slice and the simulated one;
 - `sklearn`: comparing the reference CT slice and the simulated one;
 - `lsf`: the line spread function to filter the X-ray images; and
-- `gvxrPython3`: simulation of X-ray images using the Beer-Lambert law on GPU.
+- `gvxrPython3`: [gVirtualXRay](http://gvirtualxray.sourceforge.net/)'s Python wrapper to simulate X-ray images using the Beer-Lambert law on GPU.
 
 
 ```python
