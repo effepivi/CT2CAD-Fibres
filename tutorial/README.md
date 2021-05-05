@@ -1,12 +1,25 @@
-# Registration of Tungsten fibres on XCT images
+# From Synchrotron Microtomography to CAD Models using Optimisation and Fast X-ray Simulation on GPU:
 
-This demo aims to demonstrate the use of [gVirtualXRay](http://gvirtualxray.sourceforge.net/) and mathematical optimisation to register polygon meshes onto X-ray microtomography (micro-CT) scans of a tungsten fibre. Below is an example of CT slice.
+## Registration of Tungsten Fibres on XCT Images
+
+### by Franck P. Vidal and Jean-Michel L&eacute;tang
+
+This demo aims to demonstrate how to register polygon meshes onto X-ray microtomography (micro-CT) scans of a tungsten fibre. The code relies on two building blocks:
+
+1.  A global optimisation algorithm. We use the [CMA-ES (Covariance Matrix Adaptation Evolution Strategy)](http://cma.gforge.inria.fr/http://cma.gforge.inria.fr/). It is an evolutionary algorithm for difficult non-linear non-convex optimisation problems.
+2.  A fast X-ray simulation toolkit. We use [gVirtualXRay](http://gvirtualxray.sourceforge.net/)[gVirtualXRay](http://gvirtualxray.sourceforge.net/). It is a framework supporting many modern programming languages to generate realistic X-ray images from polygon meshes (triangles or tetrahedrons) on the graphics processor unit (GPU).
+
+Below is an example of CT slice from an experiment we carried out at the [European Synchrotron Radiation Facility (ESRF)European Synchrotron Radiation Facility (ESRF)](https://www.esrf.fr/https://www.esrf.fr/).
  
 ![The fibre.](../doc/scanned_object.png)
 
-Our simulations include beam-hardening due to polychromatism and they take into account the response of the detector.
+In a previous article, on [*Investigation of artefact sources in synchrotron microtomography via virtual X-ray imaging*](https://doi.org/10.1016/j.nimb.2005.02.003) in [Nuclear Instruments and Methods in Physics Research Section B: Beam Interactions with Materials and Atoms](https://www.sciencedirect.com/journal/nuclear-instruments-and-methods-in-physics-research-section-b-beam-interactions-with-materials-and-atoms), we demonstrated that the image above was corrupted by:
 
-We use SimpleGVXR's Python wrapper and Python packages commonly used in tomography reconstruction ([Tomopy](https://tomopy.readthedocs.io/en/latest/)), image processing ([scikit-image](https://scikit-image.org/) and [SimpleITK](https://simpleitk.org/)), computer vision ([OpenCV](https://www.opencv.org/)), and non-linear numerical optimization ([CMA-ES, Covariance Matrix Adaptation Evolution Strategy](https://github.com/CMA-ES/pycma)).
+1) beam hardening depsite the use of a monochromator,
+2) the response of the camera despite the point spread function (PSF) being almost a Dirac, and
+3) phase contrast.
+
+That study was published in 2005, when computer were still relatively slow. Since then, massively parallel processors such as graphics processor units (GPUs) have emerged. Using today's hardware, we will demonstrate that we can now finely tuned the virtual experiments by mathematical optimisation to register polygons meshes on XCT data. Our simulations will include beam-hardening due to polychromatism, take into account the response of the detector, and have phase contrast.
 
 ## Registration steps
 
@@ -19,32 +32,35 @@ We use SimpleGVXR's Python wrapper and Python packages commonly used in tomograp
     - [Set the X-ray simulation environment](#Set-the-X-ray-simulation-environment)
     - [LSF](#The-LSF)
     - [Find circles to identify the centre of fibres](#Find-circles-to-identify-the-centre-of-fibres)
-2. [Registration of a cube](#Registration-of-a-cube)
-3. [Optimisation of the cores and fibres radii](#Optimisation-of-the-cores-and-fibres-radii)
-4. [Recentre each core/fibre](#Recentre-each-core/fibre)
-5. [Optimisation the radii after recentring](#Optimisation-the-radii-after-recentring)
-6. [Optimisation of the beam spectrum](#Optimisation-of-the-beam-spectrum)
-7. [Optimisation of the Poisson noise](#Optimisation-of-the-Poisson-noise)
-8. [Optimisation of the phase contrast and the radii](#Optimisation-of-the-phase-contrast-and-the-radii)
-9. [Optimisation of the phase contrast and the LSF](#Optimisation-of-the-phase-contrast-and-the-LSF)
+2. [Simulate the CT acquisition](#Simulate-the-CT-acquisition)
+3. [Registration of a cube](#Registration-of-a-cube)
+4. [Optimisation of the cores and fibres radii](#Optimisation-of-the-cores-and-fibres-radii)
+5. [Recentre each core/fibre](#Recentre-each-core/fibre)
+6. [Optimisation the radii after recentring](#Optimisation-the-radii-after-recentring)
+7. [Optimisation of the beam spectrum](#Optimisation-of-the-beam-spectrum)
+8. [Optimisation of the Poisson noise](#Optimisation-of-the-Poisson-noise)
+9. [Optimisation of the phase contrast and the radii](#Optimisation-of-the-phase-contrast-and-the-radii)
+10. [Optimisation of the phase contrast and the LSF](#Optimisation-of-the-phase-contrast-and-the-LSF)
 
 ## Import packages
 
 We need to import a few libraries (called packages in Python). We use:
- 
+
 - `copy`: duplicating images using deepcopies;
-- `math`: the `floor` function;
-- `os`: creating a new directory
 - `glob`: retrieving file names in a directory;
-- `numpy`: who doesn't use numpy?
+- `math`: the `floor` function;
+- `os`: creating a new directory;
+- `sys`: retrieving the largest possible floating-point value;
+- `cma`: non-linear numerical optimization ([CMA-ES, Covariance Matrix Adaptation Evolution Strategy](https://github.com/CMA-ES/pycma));
+- ([OpenCV](https://www.opencv.org/)) (`cv2`): Hough transform and bilateral filter (an edge-preserving smoothing filter);
 - `imageio`: creating GIF files;
-- `skimage`: comparing the reference CT slice and the simulated one, computing the Radon transform of an image, and perform a CT reconstruction using FBP and SART;
-- `sklearn`: comparing the reference CT slice and the simulated onecomparing the reference CT slice and the simulated one
-- `tomopy`: another package for CT reconstruction;
-- `SimpleITK`: image processing and saving volume data;
-- OpenCV (`cv2`): Hough transform and bilateral filter (an edge-preserving smoothing filter);
 - `matplotlib`: plotting data;
-- `cma`: non-linear numerical optimization;
+- `numpy`: who doesn't use numpy?
+- `[SimpleITK](https://simpleitk.org/))`: image processing and saving volume data;
+- `tomopy`: package for CT reconstruction;
+- `scipy`: for the convolution of a 2D image by a 1D kernel;
+- `skimage`: comparing the reference CT slice and the simulated one;
+- `sklearn`: comparing the reference CT slice and the simulated one;
 - `lsf`: the line spread function to filter the X-ray images; and
 - `gvxrPython3`: simulation of X-ray images using the Beer-Lambert law on GPU.
 
@@ -90,16 +106,30 @@ if not os.path.exists("plots"):
 
 ## Global variables
 
-We need some global variables.
+We need some global variables:
 
-- `g_reference_CT`: The reference XCT slice;
-- `g_reference_sinogram`: The Radon transform of the reference XCT slice;
-- `g_pixel_spacing_in_micrometre` and `g_pixel_spacing_in_mm`: The physical distance between the centre of two successive pixel;
-- `g_number_of_projections`: The total number of angles in the sinogram;
-- `g_angular_span_in_degrees`: The angular span covered by the sinogram;
-- `g_angular_step`: the angular step; and
-- `g_theta`: The rotation angles in degrees (vertical axis of the sinogram).
-
+-  `NoneType`: the type of `None`;
+-  `pixel_spacing_in_micrometre`: the physical distance between the centre of two successive pixel;
+-  `pixel_spacing_in_mm`: the physical distance between the centre of two successive pixel;
+-  `number_of_projections`: the total number of angles in the sinogram;he total number of angles in the sinogram;
+-  `angular_span_in_degrees`: the angular span covered by the sinogram;
+-  `angular_step`: the angular step;
+-  `theta`: the rotation angles in degrees (vertical axis of the sinogram);
+-  `theta_rad`: the rotation angles in radians (vertical axis of the sinogram);
+-  `roi_length`: control the size of the ROI when displayng the central fibre;
+-  `value_range`: control the binning of the Laplacian kernel
+-  `num_samples`: control the binning of the Laplacian kernel
+-  `sigma_set`: spread of the Laplacian kernels
+-  `k_set`: weight of the Laplacian kernels
+-  `label_set`: label of the structures on which a Laplacian kernel is applied
+-  `bias`: control the bias of the Poisson noise
+-  `gain`: control the gain of the Poisson noise: control the bias of the Poisson noise
+-  `scale`: control the scale of the Poisson noise: control the bias of the Poisson noise
+-  `use_normalisation`: use or do not use zero-mean, unit-variance normalisation in the objective functions;
+-  `use_sinogram`: compute the objective functions on the sinogram or flat-field;
+-  `metrics_type`: type of image comparison used in the objective functions;
+-  `fibre_radius`: radius of the SiC fibres in um
+-  `core_radius`: radius of the W fibres in um
 
 
 ```python
@@ -151,6 +181,8 @@ reference_normalised_projections.shape = [
 ];
 ```
 
+We define a function to save raw images in the MHA format:
+
 
 ```python
 def saveMHA(fname, image, spacing):
@@ -167,10 +199,14 @@ def saveMHA(fname, image, spacing):
     sitk.WriteImage(volume, fname, useCompression=True);
 ```
 
+The reference projections in a MHA file
+
 
 ```python
 saveMHA('outputs/reference_normalised_projections.mha', reference_normalised_projections, [pixel_spacing_in_mm, angular_step, pixel_spacing_in_mm]);
 ```
+
+Display the reference projections using Matplotlib
 
 
 ```python
@@ -192,19 +228,27 @@ plt.savefig('plots/Normalised_projections_from_experiment_ESRF.png')
 ```
 
 
-    
-![png](output_11_0.png)
-    
+
+![png](output_14_0.png)
+
 
 
 In the literature, a projection is often modelled as follows:
 
-$$P = \ln\left(\frac{I_0}{I}\right) = -\ln\left(\frac{I}{I_0}\right) = \sum_n \mu(n) \Delta_x$$
+<!--$$P = \ln\left(\frac{I_0}{I}\right) = -\ln\left(\frac{I}{I_0}\right) = \sum_n \mu(n) \Delta_x$$-->
 
+$$I = \sum_i E \times N \times \text{e}^{-\sum_i(\mu_i \times \Delta_i)}$$
 
-`reference_normalised_projections` loaded from the binary file corresponds to $\frac{I}{I_0}$. The flat-field correction has already been performed. It is now necessary to linearise the transmission tomography data using:
+with $I$ the raw X-ray projection, and with the sample and with the the X-ray beam turned on;
+$E$ and $N$ the energy in eV and the number of photons at that energy respectively;
+$i$ the $i$-th material being scanned, $\mu_i$ its linear attenuation coefficient in cm$^{-1}$ at Energy $E$, and
+$\Delta_i$ the path length of the ray crossing the $i$-th material from the X-ray source to the detector.
 
-$$-\ln(normalised\_projections)$$ 
+$$I_0 = E \times N$$
+
+`reference_normalised_projections` above corresponds to the data loaded from the binary file. It corresponds to $\frac{I}{I_0}$, i.e. the flat-field correction has already been performed. It is now necessary to linearise the transmission tomography data using:
+
+$$-\ln\left(\frac{I}{I_0}\right)$$
 
 This new image corresponds to the Radon transform, known as sinogram, of the scanned object in these experimental conditions. Once this is done, we divide the pixels of the sinogram by $\Delta_x$, which is egal to the spacing between two successive pixels along the horizontal axis.
 
@@ -240,15 +284,21 @@ def computeSinogramFromFlatField(normalised_projections):
     return simulated_sinogram;
 ```
 
+Compute the sinogram from the flat-field data
+
 
 ```python
 reference_sinogram = computeSinogramFromFlatField(reference_normalised_projections);
 ```
 
+Save the corresponding image
+
 
 ```python
 saveMHA('outputs/reference_sinogram.mha', reference_sinogram, [pixel_spacing_in_mm, angular_step, pixel_spacing_in_mm]);
 ```
+
+Display the sinogram using Matplotlib
 
 
 ```python
@@ -266,18 +316,19 @@ plt.savefig('plots/Sinogram_reference_image.png');
 ```
 
 
-    
-![png](output_16_0.png)
-    
+
+![png](output_22_0.png)
+
 
 
 ## CT reconstruction
 
-Now we got a sinogram, we can reconstruct the CT slice. As we used a synchrotron, we can assume we have a parallel source. It means we can use a FBP rather than the FDK algorithm.
+Now we got a sinogram, we can reconstruct the CT slice. As we used a synchrotron, we can assume we have a parallel source. It means we can use a FBP rather than the FDK algorithm. In fact we use the gridrec algorithm, which is much faster:
+
+Dowd BA, Campbell GH, Marr RB, Nagarkar VV, Tipnis SV, Axe L, and Siddons DP. [Developments in synchrotron x-ray computed microtomography at the national synchrotron light source](https://doi.org/10.1117/12.363725). In Proc. SPIE, volume 3772, 224–236. 1999.
 
 
 ```python
-reference_sinogram = computeSinogramFromFlatField(reference_normalised_projections);
 reference_sinogram.shape = [
     reference_sinogram.shape[0],
     1,
@@ -297,10 +348,14 @@ reference_CT = tomopy.recon(reference_sinogram,
     Reconstructing 1 slice groups with 1 master threads...
 
 
+Save the reconstruction in a MHA file
+
 
 ```python
 saveMHA('outputs/reference_CT.mha', reference_CT, [pixel_spacing_in_mm, angular_step, pixel_spacing_in_mm]);
 ```
+
+Plot the CT slice using Matplotlib
 
 
 ```python
@@ -314,18 +369,18 @@ plt.savefig('plots/reference_image_in_mu.png');
 ```
 
 
-    
-![png](output_20_0.png)
-    
+
+![png](output_28_0.png)
+
 
 
 ## Normalise the image data
 
-Zero-mean unit-variance normalisation is applied to use the reference images in objective functions and perform the registration. Note that it is called standardisation (Z-score Normalisation) in machine learning. It is computed as follows:
+Zero-mean, unit-variance normalisation is applied to use the reference images in objective functions and perform the registration. Note that it is called standardisation (or Z-score Normalisation) in machine learning. It is computed as follows:
 
 $$I' = \frac{I - \bar{I}}{\sigma}$$
 
-Where $I'$ is the image after the original image $I$ has been normalised, $\bar{I}$ is the average pixel value of $I$, and $\sigma$ is its standard deviation.
+Where $I'$ is the image after the original image $I$ has been normalised, $\bar{I}$ is the average pixel value of $I$, and $\sigma$ is its standard deviation. We define a function to apply this:
 
 
 ```python
@@ -346,6 +401,8 @@ def standardisation(I):
     return (image - image.mean()) / image.std();
 
 ```
+
+Normalise the reference sinogram and CT slice
 
 
 ```python
@@ -401,6 +458,8 @@ for energy, percentage, unit in energy_spectrum:
     gvxr.addEnergyBinToSpectrum(energy, unit, percentage);
 ```
 
+Plot the beam spectrum using Matplotlib
+
 
 ```python
 energies_in_keV = [];
@@ -422,35 +481,36 @@ plt.savefig('plots/beam_spectrum.png');
 ```
 
 
-    
-![png](output_33_0.png)
-    
+
+![png](output_43_0.png)
+
 
 
 The material properties (chemical composition and density)
 
 
 ```python
-fibre_radius = 140 / 2; # um
 fibre_material = [("Si", 0.5), ("C", 0.5)];
-fibre_mu = 2.736; # cm-1
 fibre_density = 3.2; # g/cm3
 
 core_radius = 30 / 2; # um
 core_material = [("W", 1)];
-core_mu = 341.61; # cm-1
-core_density = 19.3 # g/cm3
 
 g_matrix_width = 0;
 g_matrix_height = 0;
 g_matrix_x = 0;
 g_matrix_y = 0;
 matrix_material = [("Ti", 0.9), ("Al", 0.06), ("V", 0.04)];
-matrix_mu = 13.1274; # cm-1
 matrix_density = 4.42 # g/cm3
 ```
 
 ### The LSF
+
+In a previous study, we experimentally measured the impulse response of the detector as the line spread function (LSF):
+
+F.P. Vidal, J.M. Létang, G. Peix, P. Cloetens, Investigation of artefact sources in synchrotron microtomography via virtual X-ray imaging, *Nuclear Instruments and Methods in Physics Research Section B: Beam Interactions with Materials and Atoms*, Volume 234, Issue 3, 2005, Pages 333-348, ISSN 0168-583X, DOI [10.1016/j.nimb.2005.02.003](10.1016/j.nimb.2005.02.003).
+
+We use this model during the initial steps of the registration. The LSF model will be tuned in one of the final steps of the registration.
 
 
 ```python
@@ -458,6 +518,8 @@ t = np.arange(-20., 21., 1.);
 lsf_kernel=lsf(t*41)/lsf(0);
 lsf_kernel/=lsf_kernel.sum();
 ```
+
+Plot the LSF using Matplotlib
 
 
 ```python
@@ -469,9 +531,9 @@ plt.savefig('plots/LSF.png');
 ```
 
 
-    
-![png](output_38_0.png)
-    
+
+![png](output_49_0.png)
+
 
 
 ## Find circles to identify the centre of fibres
@@ -485,7 +547,7 @@ We first create a function to convert images in floating point numbers into UINT
 
 ```python
 def float2uint8(anImage, min_threshold = None, max_threshold = None):
-    
+
     uchar_image = copy.deepcopy(anImage);
 
     if isinstance(min_threshold, NoneType):
@@ -493,14 +555,14 @@ def float2uint8(anImage, min_threshold = None, max_threshold = None):
 
     if isinstance(max_threshold, NoneType):
         max_threshold = np.max(uchar_image);
-        
+
     uchar_image[uchar_image < min_threshold] = min_threshold;
     uchar_image[uchar_image > max_threshold] = max_threshold;
 
     uchar_image -= min_threshold;
     uchar_image /= max_threshold - min_threshold;
     uchar_image *= 255;
-    
+
     return uchar_image.astype(np.uint8);
 ```
 
@@ -516,6 +578,8 @@ saveMHA('outputs/blurred_reference_CT.mha', blurred_reference_CT, [pixel_spacing
 
 ### Apply the Hough transform
 
+As the fibres and the cores correspond to circles in the CT images, the obvious technique to try is the Hough Circle Transform (HCT). It is a feature extraction technique used in image analysis that can output a list of circles (centres and radii).
+
 
 ```python
 circles = cv2.HoughCircles(blurred_reference_CT, cv2.HOUGH_GRADIENT, 2, 80,
@@ -530,10 +594,10 @@ cimg = cv2.cvtColor(blurred_reference_CT, cv2.COLOR_GRAY2BGR);
 circles = np.uint16(np.around(circles));
 
 for i in circles[0,:]:
-    
+
     # draw the outer circle
     cv2.circle(cimg, (i[0], i[1]), i[2], (0, 255, 0), 2);
-    
+
     # draw the center of the circle
     cv2.circle(cimg, (i[0], i[1]), 2, (0, 0, 255), 3);
 ```
@@ -548,12 +612,12 @@ plt.savefig('plots/fibre_detection_using_Hough_transform.png');
 ```
 
 
-    
-![png](output_49_0.png)
-    
+
+![png](output_60_0.png)
 
 
-Unlike the previous example, did did not work that well. Here 13 fibres were missed. Many centres are also misplaced. We will use another technique to register the fibres, the popular Otsu's method. It creates a histogram and uses a heuristic to determine a threshold value.
+
+13 fibres were missed and many centres were misplaced. Controlling the meta-parameters of the algorithm can be difficult to employ in a fully-automatic registration framework. We will use another technique to register the fibres, the popular Otsu's method. It creates a histogram and uses a heuristic to determine a threshold value.
 
 
 ```python
@@ -589,9 +653,9 @@ plt.savefig('plots/fibre_detection_using_otsu_method.png');
 ```
 
 
-    
-![png](output_53_0.png)
-    
+
+![png](output_64_0.png)
+
 
 
 ### Clean up
@@ -618,12 +682,14 @@ plt.savefig('plots/fibre_detection_using_otsu_method_after_cleaning.png');
 ```
 
 
-    
-![png](output_57_0.png)
-    
+
+![png](output_68_0.png)
+
 
 
 ## Mark each potential tungsten corewith unique label
+
+Each distinct tungsten core is assigned a unique label, i.e. a unique pixel intensity
 
 
 ```python
@@ -640,9 +706,9 @@ plt.savefig('plots/fibre_detection_with_label_overlay.png');
 ```
 
 
-    
-![png](output_60_0.png)
-    
+
+![png](output_72_0.png)
+
 
 
 ### Object Analysis
@@ -664,7 +730,7 @@ for i in shape_stats.GetLabels():
     centroid_set.append(cleaned_thresh_img.TransformPhysicalPointToIndex(shape_stats.GetCentroid(i)));
 ```
 
-We now have a list of the centres of all the fibres that can be used as a parameter of the function below to create the cylinders corresponding to the cores and the fibres. 
+We now have a list of the centres of all the fibres that can be used as a parameter of the function below to create the cylinders corresponding to the cores and the fibres.
 For each core, a cylinder is creatd and translated:
 ```python
         gvxr.emptyMesh("core_"  + str(i));
@@ -810,6 +876,8 @@ def setMatrix(apGeneSet):
 
 ### Simulate the CT acquisition
 
+There are 7 successive steps to simulate the XCT data acquisition:
+
 1. Set the fibre and cores geometries and material properties (Step 39)
 2. Set the matrix geometry and material properties (Step 40)
 3. Simulate the raw projections for each angle:
@@ -860,13 +928,11 @@ Because the data suffers from a fixed-pattern noise in X-ray imaging in
 actual experiments, it is necessary to perform the flat-field correction of
 the raw projections using:
 
-$$corrected\_projections = \frac{raw\_projections\_in\_keV − dark\_field\_image}{flat\_field\_image − dark\_field\_image}$$
+$$I' = \frac{I - D}{F - D}$$
 
-- $raw\_projections\_in\_keV$ are the raw projections with the X-ray beam turned on and with the scanned object,
-- $flat\_field\_image$ is an image with the X-ray beam turned on but without the scanned object, and
-- $dark\_field\_image$ is an image with the X-ray beam turned off.
+where $F$ (flat fields) and $D$ (dark fields) are projection images without sample and acquired with and without the X-ray beam turned on respectively. $I'$ corresponds to `corrected_projections` in the function below.
 
-Note that in our example, $raw\_projections\_in\_keV$, $flat\_field\_image$ and $dark\_field\_image$ are in keV whereas $corrected\_projections$ does not have any unit:
+Note that in our example, `raw_projections_in_keV`, `flat_field_image` and `dark_field_image` are in keV whereas `corrected_projections` does not have any unit:
 
 $$0 \leq raw\_projections\_in\_keV \leq  \sum_E N_0(E) \times E\\0 \leq corrected\_projections \leq 1$$
 
@@ -903,7 +969,7 @@ def flatFieldCorrection(raw_projections_in_keV):
     return corrected_projections;
 ```
 
-The function below is used to simulate a sinogram acquisition. Phase contrast in the projections can be taken into account or not.
+The function below is used to simulate a sinogram acquisition. Phase contrast in the projections can be taken into account or not. Also, Poisson noise can be added.
 
 
 ```python
@@ -1111,7 +1177,7 @@ else:
 
     matrix_geometry_parameters = copy.deepcopy(es.result.xbest);
     np.savetxt("outputs/cube.dat", matrix_geometry_parameters, header='x,y,rotation_angle,w,h');
-    
+
     # Release memory
     del es;
 ```
@@ -1398,7 +1464,7 @@ plt.tight_layout()
 fig.suptitle('CT slice with fibres after the registration')
 
 ax1.set_title("Reference image");
-imgplot1 = ax1.imshow(normalised_reference_CT, cmap="gray", 
+imgplot1 = ax1.imshow(normalised_reference_CT, cmap="gray",
                      norm=norm);
 
 ax2.set_title("Simulated CT slice after automatic registration");
@@ -1407,8 +1473,8 @@ imgplot2 = ax2.imshow(normalised_simulated_CT,
                      norm=norm);
 
 comp_equalized = compare_images(normalised_reference_CT, normalised_simulated_CT, method='checkerboard');
-ax3.set_title("Checkboard comparison between\n" + 
-              "the reference and simulated images\nZNCC: " + 
+ax3.set_title("Checkboard comparison between\n" +
+              "the reference and simulated images\nZNCC: " +
               "{:.2f}".format(100.0 * np.mean(np.multiply(normalised_reference_CT, normalised_simulated_CT))));
 imgplot3 = ax3.imshow(comp_equalized,
                      cmap='gray',
@@ -1419,9 +1485,9 @@ plt.savefig('plots/simulated_CT_slice_with_fibres_after_cube_registration.png');
 ```
 
 
-    
-![png](output_95_0.png)
-    
+
+![png](output_107_0.png)
+
 
 
 
@@ -1461,10 +1527,10 @@ def fitnessFunctionFibres(x):
     # It is used to save the data to create animations.
     if best_fitness > objective:
         best_fitness = objective;
-        
+
         gvxr.saveSTLfile("core",  "outputs/" + prefix + str(best_fitness_id) + "_cores.stl");
         gvxr.saveSTLfile("fibre", "outputs/" + prefix + str(best_fitness_id) + "_fibres.stl");
-        
+
         # Reconstruct the CT slice
         simulated_CT = tomopy.recon(simulated_sinogram,
                                     theta_rad,
@@ -1473,7 +1539,7 @@ def fitnessFunctionFibres(x):
                                     algorithm='gridrec',
                                     filter_name='shepp',
                                     ncore=40)[0];
-        
+
         # Save the simulated sinogram
         simulated_sinogram.shape = (simulated_sinogram.size // simulated_sinogram.shape[2], simulated_sinogram.shape[2]);
         saveMHA("outputs/" + prefix + "simulated_sinogram_" + str(best_fitness_id) + ".mha",
@@ -1509,7 +1575,7 @@ else:
     best_fitness = sys.float_info.max;
     best_fitness_id = 0;
     prefix = "fibre1_";
-    
+
     opts = cma.CMAOptions()
     opts.set('tolfun', 1e-3);
     opts['tolx'] = 1e-3;
@@ -1521,7 +1587,7 @@ else:
     core_radius = fibre_radius * es.result.xbest[1];
 
     np.savetxt("outputs/fibre1_radii.dat", [core_radius, fibre_radius], header='core_radius_in_um,fibre_radius_in_um');
-    
+
     # Release memory
     del es;
 ```
@@ -1807,7 +1873,7 @@ else:
     core_radius = fibre_radius * es.result.xbest[1];
 
     np.savetxt("outputs/fibre3_radii.dat", [core_radius, fibre_radius], header='core_radius_in_um,fibre_radius_in_um');
-    
+
     # Release memory
     del es;
 ```
@@ -1930,13 +1996,13 @@ print("ZNCC radii registration 2:",
 def fitnessHarmonics(x):
 
     global energy_spectrum;
-    
+
     global use_normalisation;
-    
+
     global best_fitness;
     global best_fitness_id;
     global prefix;
-    
+
     energy_33_keV = x[0];
     first_order_harmonics = x[1];
     second_order_harmonics = x[2];
@@ -1965,12 +2031,12 @@ def fitnessHarmonics(x):
     else:
         objective = metrics(reference_normalised_projections, normalised_projections);
     use_normalisation = old_normalisation;
-   
+
     # The block below is not necessary for the registration.
     # It is used to save the data to create animations.
     if best_fitness > objective:
         best_fitness = objective;
-        
+
         # Reconstruct the CT slice
         simulated_CT = tomopy.recon(simulated_sinogram,
                                     theta_rad,
@@ -1985,7 +2051,7 @@ def fitnessHarmonics(x):
         saveMHA("outputs/" + prefix + "simulated_sinogram_" + str(best_fitness_id) + ".mha",
                 simulated_sinogram,
                 [pixel_spacing_in_mm, angular_step, pixel_spacing_in_mm]);
-        
+
         # Save the simulated CT slice
         saveMHA("outputs/" + prefix + "simulated_CT_" + str(best_fitness_id) + ".mha",
                 simulated_CT,
@@ -2017,7 +2083,7 @@ else:
     best_fitness = sys.float_info.max;
     best_fitness_id = 0;
     prefix = "spectrum1_";
-    
+
     opts = cma.CMAOptions()
     opts.set('tolfun', 1e-2);
     opts['tolx'] = 1e-2;
@@ -2030,7 +2096,7 @@ else:
     energy_spectrum = [(33, es.result.xbest[0] / total, "keV"), (66, es.result.xbest[1] / total, "keV"), (99, es.result.xbest[2] / total, "keV")];
 
     np.savetxt("outputs/spectrum1.dat", [es.result.xbest[0] / total, es.result.xbest[1] / total, es.result.xbest[2] / total], header='weight of main energy,weight of first order harmonics,weight of second order harmonics');
-    
+
     # Release memory
     del es;
 ```
@@ -2137,12 +2203,12 @@ def laplacian(x, sigma):
     This function create a Laplacian kernel with
 
     $$ g''(x) = \left(\frac{x^2}{\sigma^4} - \frac{1}{\sigma^2}\right) \exp\left(-\frac{x^2}{2\sigma^2}\right) $$
-    
-    :param array x: 
+
+    :param array x:
     :param float sigma:
     :return the convolution kernel
     """
-    
+
     return (np.power(x, 2.) / math.pow(sigma, 4) - 1. / math.pow(sigma, 2)) * np.exp(-np.power(x, 2.) / (2. * math.pow(sigma, 2)));
 ```
 
@@ -2152,8 +2218,8 @@ def getLBuffer(object):
 
     """
     This function compute the L-buffer of the object over all the angles
-    
-    :param str object: the name of the object 
+
+    :param str object: the name of the object
     :return the L-buffer over all the angles
     """
 
@@ -2181,7 +2247,7 @@ def fitnessFunctionLaplacian(x):
     global best_fitness;
     global best_fitness_id;
     global prefix;
-    
+
     global fibre_radius;
     global core_radius;
 
@@ -2202,8 +2268,8 @@ def fitnessFunctionLaplacian(x):
 
     # Simulate a sinogram
     simulated_sinogram, normalised_projections, raw_projections_in_keV = simulateSinogram(
-        [sigma_core, sigma_fibre, sigma_matrix], 
-        [k_core, k_fibre, k_matrix], 
+        [sigma_core, sigma_fibre, sigma_matrix],
+        [k_core, k_fibre, k_matrix],
         ["core", "fibre", "matrix"]
     );
 
@@ -2212,12 +2278,12 @@ def fitnessFunctionLaplacian(x):
         objective = metrics(reference_sinogram, simulated_sinogram);
     else:
         objective = metrics(reference_normalised_projections, normalised_projections);
-   
+
     # The block below is not necessary for the registration.
     # It is used to save the data to create animations.
     if best_fitness > objective:
         best_fitness = objective;
-                
+
         # Reconstruct the CT slice
         simulated_CT = tomopy.recon(simulated_sinogram,
                                     theta_rad,
@@ -2239,7 +2305,7 @@ def fitnessFunctionLaplacian(x):
                 [pixel_spacing_in_mm, pixel_spacing_in_mm, pixel_spacing_in_mm]);
 
         np.savetxt("outputs/" + prefix + str(best_fitness_id) + ".dat", [sigma_core, k_core, sigma_fibre, k_fibre, sigma_matrix, k_matrix, core_radius, fibre_radius], header='sigma_core, k_core, sigma_fibre, k_fibre, sigma_matrix, k_matrix, core_radius_in_um, fibre_radius_in_um');
-    
+
         best_fitness_id += 1;
 
     return objective
@@ -2271,23 +2337,23 @@ else:
     k_matrix = 1000.0;
 
     x0 = [
-        sigma_core, k_core, 
-        sigma_fibre, k_fibre, 
-        sigma_matrix, k_matrix, 
+        sigma_core, k_core,
+        sigma_fibre, k_fibre,
+        sigma_matrix, k_matrix,
         core_radius, fibre_radius
     ];
-    
+
     bounds = [
         [
-            0.005, 0.0, 
-             0.005, 0.0, 
-             0.005, 0.0, 
+            0.005, 0.0,
+             0.005, 0.0,
+             0.005, 0.0,
              0.95 * core_radius, 0.95 * fibre_radius
         ],
         [
-            10.0, 2000, 
-             2.5, 2000, 
-             2.5, 2000, 
+            10.0, 2000,
+             2.5, 2000,
+             2.5, 2000,
              1.15 * core_radius, 1.15 * fibre_radius
         ]
     ];
@@ -2315,7 +2381,7 @@ else:
     fibre_radius = es.result.xbest[7];
 
     np.savetxt("outputs/laplacian1.dat", [sigma_core, k_core, sigma_fibre, k_fibre, sigma_matrix, k_matrix, core_radius, fibre_radius], header='sigma_core, k_core, sigma_fibre, k_fibre, sigma_matrix, k_matrix, core_radius_in_um, fibre_radius_in_um');
-    
+
     # Release memory
     del es;
 ```
@@ -2511,7 +2577,7 @@ print("Fibre diameter:", round(fibre_radius * 2), "um");
 ```python
 # Simulate the corresponding CT aquisition
 sigma_set = [sigma_core, sigma_fibre, sigma_matrix];
-k_set = [k_core, k_fibre, k_matrix]; 
+k_set = [k_core, k_fibre, k_matrix];
 label_set = ["core", "fibre", "matrix"];
 
 simulated_sinogram, normalised_projections, raw_projections_in_keV = simulateSinogram(sigma_set, k_set, label_set);
@@ -2548,7 +2614,7 @@ def fitnessFunctionLaplacianLSF(x):
     global best_fitness;
     global best_fitness_id;
     global prefix;
-    
+
     global lsf_kernel;
 
     # sigma_core = x[0];
@@ -2572,8 +2638,8 @@ def fitnessFunctionLaplacianLSF(x):
 
     # Simulate a sinogram
     simulated_sinogram, normalised_projections, raw_projections_in_keV = simulateSinogram(
-        [sigma_core, sigma_fibre, sigma_matrix], 
-        [k_core, k_fibre, k_matrix], 
+        [sigma_core, sigma_fibre, sigma_matrix],
+        [k_core, k_fibre, k_matrix],
         ["core", "fibre", "matrix"]
     );
 
@@ -2582,12 +2648,12 @@ def fitnessFunctionLaplacianLSF(x):
         objective = metrics(reference_sinogram, simulated_sinogram);
     else:
         objective = metrics(reference_normalised_projections, normalised_projections);
-   
+
     # The block below is not necessary for the registration.
     # It is used to save the data to create animations.
     if best_fitness > objective:
         best_fitness = objective;
-        
+
         # Reconstruct the CT slice
         simulated_CT = tomopy.recon(simulated_sinogram,
                                     theta_rad,
@@ -2596,13 +2662,13 @@ def fitnessFunctionLaplacianLSF(x):
                                     algorithm='gridrec',
                                     filter_name='shepp',
                                     ncore=40)[0];
-        
+
         # Save the simulated sinogram
         simulated_sinogram.shape = (simulated_sinogram.size // simulated_sinogram.shape[2], simulated_sinogram.shape[2]);
         saveMHA("outputs/" + prefix + "simulated_sinogram_" + str(best_fitness_id) + ".mha",
                 simulated_sinogram,
                 [pixel_spacing_in_mm, angular_step, pixel_spacing_in_mm]);
-        
+
         # Save the simulated CT slice
         saveMHA("outputs/" + prefix + "simulated_CT_" + str(best_fitness_id) + ".mha",
                 simulated_CT,
@@ -2611,7 +2677,7 @@ def fitnessFunctionLaplacianLSF(x):
         np.savetxt("outputs/" + prefix + "laplacian_" + str(best_fitness_id) + ".dat", [k_core, k_fibre, k_matrix], header='k_core, k_fibre, k_matrix');
         np.savetxt("outputs/" + prefix + "LSF_" + str(best_fitness_id) + ".dat", [a2, b2, c2, d2, e2, f2], header='a2, b2, c2, d2, e2, f2');
 
-        
+
         best_fitness_id += 1;
 
     return objective;
@@ -2705,7 +2771,7 @@ else:
 
     np.savetxt("outputs/laplacian2.dat", [k_core, k_fibre, k_matrix], header='k_core, k_fibre, k_matrix');
     np.savetxt("outputs/lsf2.dat", [a2, b2, c2, d2, e2, f2], header='a2, b2, c2, d2, e2, f2');
-    
+
     # Release memory
     del es;
 ```
@@ -2796,7 +2862,7 @@ np.savetxt("outputs/LSF_optimised.txt", lsf_kernel);
 ```python
 # Simulate the corresponding CT aquisition
 sigma_set = [sigma_core, sigma_fibre, sigma_matrix];
-k_set = [k_core, k_fibre, k_matrix]; 
+k_set = [k_core, k_fibre, k_matrix];
 label_set = ["core", "fibre", "matrix"];
 
 simulated_sinogram, normalised_projections, raw_projections_in_keV = simulateSinogram(sigma_set, k_set, label_set);
@@ -2836,9 +2902,9 @@ plt.savefig('plots/LSF_optimised.png');
 ```
 
 
-    
-![png](output_146_0.png)
-    
+
+![png](output_158_0.png)
+
 
 
 ### Extract the fibre in the centre of the CT slices
@@ -2887,7 +2953,7 @@ plt.tight_layout()
 fig.suptitle('Fibre in the centre of the CT slices')
 
 ax1.set_title("Reference image");
-imgplot1 = ax1.imshow(reference_fibre_in_centre, cmap="gray", 
+imgplot1 = ax1.imshow(reference_fibre_in_centre, cmap="gray",
                      norm=norm);
 
 ax2.set_title("Simulated CT slice after automatic registration");
@@ -2896,8 +2962,8 @@ imgplot2 = ax2.imshow(test_fibre_in_centre,
                      norm=norm);
 
 comp_equalized = compare_images(reference_fibre_in_centre, test_fibre_in_centre, method='checkerboard');
-ax3.set_title("Checkboard comparison between\n" + 
-              "the reference and simulated images\nZNCC: " + 
+ax3.set_title("Checkboard comparison between\n" +
+              "the reference and simulated images\nZNCC: " +
               "{:.2f}".format(100.0 * np.mean(np.multiply(reference_fibre_in_centre, test_fibre_in_centre))));
 imgplot3 = ax3.imshow(comp_equalized,
                      cmap='gray',
@@ -2905,9 +2971,9 @@ imgplot3 = ax3.imshow(comp_equalized,
 ```
 
 
-    
-![png](output_150_0.png)
-    
+
+![png](output_162_0.png)
+
 
 
 ## Optimisation of the Poisson noise
@@ -2918,7 +2984,7 @@ def fitnessFunctionNoise(x):
     global best_fitness;
     global best_fitness_id;
     global prefix;
-    
+
     bias = x[0];
     gain = x[1];
     scale = x[2];
@@ -2928,7 +2994,7 @@ def fitnessFunctionNoise(x):
     temp = np.random.poisson(map).astype(float);
     temp /= gain;
     temp -= bias + 1;
-    
+
     # Noise map
     noise_map = normalised_projections_ROI - temp;
     noise_map *= scale;
@@ -2943,19 +3009,19 @@ def fitnessFunctionNoise(x):
     # Difference of std dev between the reference and the simulated image
     diff = reference_noise_ROI_stddev - noisy_image_noise_ROI_stddev;
     objective = diff * diff;
-    
+
     # The block below is not necessary for the registration.
     # It is used to save the data to create animations.
     if best_fitness > objective:
         best_fitness = objective;
-    
+
         # Save the simulated CT slice
         saveMHA("outputs/" + prefix + "noisy_image_" + str(best_fitness_id) + ".mha",
                 noisy_image,
                 [pixel_spacing_in_mm, pixel_spacing_in_mm, pixel_spacing_in_mm]);
 
         np.savetxt("outputs/" + prefix + str(best_fitness_id) + ".dat", [bias, gain, scale], header='bias, gain, scale');
-        
+
         best_fitness_id += 1;
 
     return objective
@@ -2996,7 +3062,7 @@ else:
     saveMHA("outputs/normalised_projections_ROI.mha",
            normalised_projections_ROI,
            [pixel_spacing_in_mm, angular_step, pixel_spacing_in_mm]);
-    
+
     # Initialise the values
     bias = 0.0;
     gain = 255.0;
@@ -3027,7 +3093,7 @@ else:
     scale = es.result.xbest[2];
 
     np.savetxt("outputs/poisson-noise.dat", [bias, gain, scale], header='bias, gain, scale');
-    
+
     # Release memory
     del es;
 ```
@@ -3087,7 +3153,7 @@ plt.tight_layout()
 fig.suptitle('CT slice with fibres after the registration')
 
 ax1.set_title("Reference image");
-imgplot1 = ax1.imshow(normalised_reference_CT, cmap="gray", 
+imgplot1 = ax1.imshow(normalised_reference_CT, cmap="gray",
                      norm=norm);
 
 ax2.set_title("Simulated CT slice after automatic registration");
@@ -3096,8 +3162,8 @@ imgplot2 = ax2.imshow(normalised_simulated_CT,
                      norm=norm);
 
 comp_equalized = compare_images(normalised_reference_CT, normalised_simulated_CT, method='checkerboard');
-ax3.set_title("Checkboard comparison between\n" + 
-              "the reference and simulated images\nZNCC: " + 
+ax3.set_title("Checkboard comparison between\n" +
+              "the reference and simulated images\nZNCC: " +
               "{:.2f}".format(100.0 * np.mean(np.multiply(normalised_reference_CT, normalised_simulated_CT))));
 imgplot3 = ax3.imshow(comp_equalized,
                      cmap='gray',
@@ -3105,9 +3171,9 @@ imgplot3 = ax3.imshow(comp_equalized,
 ```
 
 
-    
-![png](output_158_0.png)
-    
+
+![png](output_170_0.png)
+
 
 
 
@@ -3125,9 +3191,9 @@ plt.legend();
 ```
 
 
-    
-![png](output_159_0.png)
-    
+
+![png](output_171_0.png)
+
 
 
 
