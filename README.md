@@ -239,18 +239,18 @@ In the literature, a projection is often modelled as follows:
 
 <img src="https://render.githubusercontent.com/render/math?math=I = \sum_i E \times N \times \text{e}^{-\sum_i(\mu_i \times \Delta_i)}" />
 
-with $I$ the raw X-ray projection, and with the sample and with the the X-ray beam turned on;
-$E$ and $N$ the energy in eV and the number of photons at that energy respectively;
-$i$ the $i$-th material being scanned, $\mu_i$ its linear attenuation coefficient in cm$^{-1}$ at Energy $E$, and
-$\Delta_i$ the path length of the ray crossing the $i$-th material from the X-ray source to the detector.
+with <img src="https://render.githubusercontent.com/render/math?math=I" /> the raw X-ray projection, and with the sample and with the the X-ray beam turned on;
+<img src="https://render.githubusercontent.com/render/math?math=E" /> and <img src="https://render.githubusercontent.com/render/math?math=N" /> the energy in eV and the number of photons at that energy respectively;
+<img src="https://render.githubusercontent.com/render/math?math=i" /> the <img src="https://render.githubusercontent.com/render/math?math=i" />-th material being scanned, <img src="https://render.githubusercontent.com/render/math?math=\mu_i" /> its linear attenuation coefficient in cm<sup>-1</sup> at Energy <img src="https://render.githubusercontent.com/render/math?math=E" />, and
+<img src="https://render.githubusercontent.com/render/math?math=\Delta_i" /> the path length of the ray crossing the <img src="https://render.githubusercontent.com/render/math?math=i" />-th material from the X-ray source to the detector.
 
 <img src="https://render.githubusercontent.com/render/math?math=I_0 = E \times N" />
 
-`reference_normalised_projections` above corresponds to the data loaded from the binary file. It corresponds to $\frac{I}{I_0}$, i.e. the flat-field correction has already been performed. It is now necessary to linearise the transmission tomography data using:
+`reference_normalised_projections` above corresponds to the data loaded from the binary file. It corresponds to <img src="https://render.githubusercontent.com/render/math?math=\frac{I}{I_0}" />, i.e. the flat-field correction has already been performed. It is now necessary to linearise the transmission tomography data using:
 
 <img src="https://render.githubusercontent.com/render/math?math=-\ln\left(\frac{I}{I_0}\right)" />
 
-This new image corresponds to the Radon transform, known as sinogram, of the scanned object in these experimental conditions. Once this is done, we divide the pixels of the sinogram by $\Delta_x$, which is egal to the spacing between two successive pixels along the horizontal axis.
+This new image corresponds to the Radon transform, known as sinogram, of the scanned object in these experimental conditions. Once this is done, we divide the pixels of the sinogram by <img src="https://render.githubusercontent.com/render/math?math=\Delta_x" />, which is egal to the spacing between two successive pixels along the horizontal axis.
 
 We define a new function to compute the sinogram from flat-field correction and calls it straightaway.
 
@@ -380,7 +380,7 @@ Zero-mean, unit-variance normalisation is applied to use the reference images in
 
 <img src="https://render.githubusercontent.com/render/math?math=I' = \frac{I - \bar{I}}{\sigma}" />
 
-Where $I'$ is the image after the original image $I$ has been normalised, $\bar{I}$ is the average pixel value of $I$, and $\sigma$ is its standard deviation. We define a function to apply this:
+Where <img src="https://render.githubusercontent.com/render/math?math=I'" /> is the image after the original image <img src="https://render.githubusercontent.com/render/math?math=I" /> has been normalised, <img src="https://render.githubusercontent.com/render/math?math=\bar{I}" /> is the average pixel value of <img src="https://render.githubusercontent.com/render/math?math=I" />, and <img src="https://render.githubusercontent.com/render/math?math=\sigma" /> is its standard deviation. We define a function to apply this:
 
 
 ```python
@@ -930,7 +930,7 @@ the raw projections using:
 
 <img src="https://render.githubusercontent.com/render/math?math=I' = \frac{I - D}{F - D}" />
 
-where $F$ (flat fields) and $D$ (dark fields) are projection images without sample and acquired with and without the X-ray beam turned on respectively. $I'$ corresponds to `corrected_projections` in the function below.
+where <img src="https://render.githubusercontent.com/render/math?math=F" /> (flat fields) and <img src="https://render.githubusercontent.com/render/math?math=D" /> (dark fields) are projection images without sample and acquired with and without the X-ray beam turned on respectively. <img src="https://render.githubusercontent.com/render/math?math=I'" /> corresponds to `corrected_projections` in the function below.
 
 Note that in our example, `raw_projections_in_keV`, `flat_field_image` and `dark_field_image` are in keV whereas `corrected_projections` does not have any unit:
 
@@ -1390,7 +1390,7 @@ if not os.path.exists("plots/cube_registration.gif"):
 
 ### Adding the fibres
 
-The radius of a tungsten core is 30 / 2 um. The pixel spacing is 1.9 um. The radius in number of pixels is $15/1.9  \approx  7.89$. The area of a core is $(15/1.9)^2  \pi  \approx 196$ pixels.
+The radius of a tungsten core is 30 / 2 um. The pixel spacing is 1.9 um. The radius in number of pixels is <img src="https://render.githubusercontent.com/render/math?math=15/1.9  \approx  7.89" />. The area of a core is <img src="https://render.githubusercontent.com/render/math?math=(15/1.9)^2  \pi  \approx 196" /> pixels.
 
 
 ```python
