@@ -41,6 +41,7 @@ That study was published in 2005, when computer were still relatively slow. Sinc
 8. [Optimisation of the Poisson noise](#Optimisation-of-the-Poisson-noise)
 9. [Optimisation of the phase contrast and the radii](#Optimisation-of-the-phase-contrast-and-the-radii)
 10. [Optimisation of the phase contrast and the LSF](#Optimisation-of-the-phase-contrast-and-the-LSF)
+11. [Results in terms of linear attenuation coefficients](#Results-in-terms-of-linear-attenuation-coefficients)
 
 ## Import packages
 
@@ -54,8 +55,10 @@ We need to import a few libraries (called packages in Python). We use:
 - `cma`: non-linear numerical optimization ([CMA-ES, Covariance Matrix Adaptation Evolution Strategy](https://github.com/CMA-ES/pycma));
 - ([OpenCV](https://www.opencv.org/)) (`cv2`): Hough transform and bilateral filter (an edge-preserving smoothing filter);
 - `imageio`: creating GIF files;
+- `IPython.display`: display Pandas'dataframes as HTML tables;
 - `matplotlib`: plotting data;
 - `numpy`: who doesn't use numpy?
+- `pandas`: creating a DataFrame to store <img src="https://render.githubusercontent.com/render/math?math=\mu" /> data;
 - `[SimpleITK](https://simpleitk.org/))`: image processing and saving volume data;
 - `tomopy`: package for CT reconstruction;
 - `scipy`: for the convolution of a 2D image by a 1D kernel;
@@ -79,8 +82,11 @@ import cv2
 import imageio
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import SimpleITK as sitk
 import tomopy
+
+from IPython.display import display
 from matplotlib import cm
 from scipy import ndimage
 from skimage.metrics import structural_similarity as ssim
@@ -3192,11 +3198,350 @@ plt.legend();
 
 
 
-![png](doc/output_171_0.png)
+![png](output_171_0.png)
 
 
+
+## Results in terms of linear attenuation coefficients
+
+Reduce the ROI size to focus on a single fibre and its surrounding matrix
 
 
 ```python
+roi_length = 40
+```
+
+Extract the ROIs
+
+
+```python
+reference_fibre_in_centre = np.array(copy.deepcopy(reference_CT[cylinder_position_in_centre_of_slice[1] - roi_length:cylinder_position_in_centre_of_slice[1] + roi_length, cylinder_position_in_centre_of_slice[0] - roi_length:cylinder_position_in_centre_of_slice[0] + roi_length]));
+test_fibre_in_centre = np.array(copy.deepcopy(simulated_CT[cylinder_position_in_centre_of_slice[1] - roi_length:cylinder_position_in_centre_of_slice[1] + roi_length, cylinder_position_in_centre_of_slice[0] - roi_length:cylinder_position_in_centre_of_slice[0] + roi_length]));
+```
+
+Save the ROIs
+
+
+```python
+saveMHA("outputs/reference_fibre_in_centre.mha", reference_fibre_in_centre, [pixel_spacing_in_mm, pixel_spacing_in_mm]);
+saveMHA("outputs/test_fibre_in_centre.mha", test_fibre_in_centre, [pixel_spacing_in_mm, pixel_spacing_in_mm]);
+```
+
+A function to create a circular binary mask
+
+
+```python
+def create_circular_mask(h, w, center=None, radius=None):
+
+    if center is None: # use the middle of the image
+        center = (int(w/2), int(h/2))
+    if radius is None: # use the smallest distance between the center and image walls
+        radius = min(center[0], center[1], w-center[0], h-center[1])
+
+    Y, X = np.ogrid[:h, :w]
+    dist_from_center = np.sqrt((X - center[0])**2 + (Y-center[1])**2)
+
+    mask = dist_from_center <= radius
+    return np.array(mask, dtype=bool);
+```
+
+A function to create the binary masks for the core, fibre and matrix
+
+
+```python
+def createMasks(mask_shape):
+    fibre_radius_in_px = fibre_radius / pixel_spacing_in_micrometre
+    core_radius_in_px = core_radius / pixel_spacing_in_micrometre
+
+    core_mask = create_circular_mask(mask_shape[1], mask_shape[0], None, core_radius_in_px);
+
+    fibre_mask = create_circular_mask(mask_shape[1], mask_shape[0], None, fibre_radius_in_px);
+    matrix_mask = np.logical_not(fibre_mask);
+
+    #fibre_mask = np.subtract(fibre_mask, core_mask);
+    fibre_mask = np.bitwise_xor(fibre_mask, core_mask);
+
+    #TypeError: numpy boolean subtract, the `-` operator, is not supported, use the bitwise_xor, the `^` operator, or the logical_xor function instead.
+
+    return core_mask, fibre_mask, matrix_mask
+```
+
+Create binary masks for the core, fibre and matrix
+
+
+```python
+mask_shape = reference_fibre_in_centre.shape;
+core_mask, fibre_mask, matrix_mask = createMasks(mask_shape);
+
+core_mask = ndimage.binary_erosion(core_mask).astype(core_mask.dtype);
+
+for i in range(4):
+    fibre_mask = ndimage.binary_erosion(fibre_mask).astype(fibre_mask.dtype);
+    matrix_mask = ndimage.binary_erosion(matrix_mask, border_value=1).astype(matrix_mask.dtype);
+
+core_mask.shape = [core_mask.shape[0], core_mask.shape[1]]
+fibre_mask.shape = [fibre_mask.shape[0], fibre_mask.shape[1]]
+matrix_mask.shape = [matrix_mask.shape[0], matrix_mask.shape[1]]
 
 ```
+
+Save the binary masks
+
+
+```python
+saveMHA("outputs/core_mask.mha", core_mask.astype(np.uint8), [pixel_spacing_in_mm, pixel_spacing_in_mm, pixel_spacing_in_mm]);
+saveMHA("outputs/fibre_mask.mha", fibre_mask.astype(np.uint8), [pixel_spacing_in_mm, pixel_spacing_in_mm, pixel_spacing_in_mm]);
+saveMHA("outputs/matrix_mask.mha", matrix_mask.astype(np.uint8), [pixel_spacing_in_mm, pixel_spacing_in_mm, pixel_spacing_in_mm]);
+```
+
+Display the masks
+
+
+```python
+norm = cm.colors.Normalize(vmax=1, vmin=0)
+
+fig, (ax1, ax2, ax3) = plt.subplots(1, 3)
+plt.tight_layout()
+fig.suptitle('Binary mask for every structure')
+
+ax1.set_title("W core");
+imgplot1 = ax1.imshow(core_mask, cmap="gray",
+                     norm=norm);
+
+ax2.set_title("SiC fibre");
+imgplot2 = ax2.imshow(fibre_mask,
+                     cmap='gray',
+                     norm=norm);
+
+ax3.set_title("Ti90Al6V4 matrix");
+imgplot3 = ax3.imshow(matrix_mask,
+                     cmap='gray',
+                     norm=norm);
+```
+
+
+
+![png](output_188_0.png)
+
+
+
+A function to collect all the <img src="https://render.githubusercontent.com/render/math?math=\mu" /> statistics from the masks.
+
+
+```python
+def getMuStatistics(reference_fibre_in_centre, test_fibre_in_centre, core_mask, fibre_mask, matrix_mask):
+
+    data = [];
+    index = np.nonzero(core_mask);
+
+    data.append(["Theorical",
+                "Core",
+                "W",
+                341.61,
+                341.61,
+                341.61,
+                0.0]);
+
+    data.append(["Experimental",
+                "Core",
+                "W",
+                np.min(reference_fibre_in_centre[index]),
+                np.max(reference_fibre_in_centre[index]),
+                np.mean(reference_fibre_in_centre[index]),
+                np.std(reference_fibre_in_centre[index])]);
+
+    data.append(["Simulated",
+                "Core",
+                "W",
+                np.min(test_fibre_in_centre[index]),
+                np.max(test_fibre_in_centre[index]),
+                np.mean(test_fibre_in_centre[index]),
+                np.std(test_fibre_in_centre[index])]);
+
+    index = np.nonzero(fibre_mask);
+
+    data.append(["Theorical",
+                "Fibre",
+                "SiC",
+                2.736,
+                2.736,
+                2.736,
+                0.0]);
+
+    data.append(["Experimental",
+                "Fibre",
+                "SiC",
+                np.min(reference_fibre_in_centre[index]),
+                np.max(reference_fibre_in_centre[index]),
+                np.mean(reference_fibre_in_centre[index]),
+                np.std(reference_fibre_in_centre[index])]);
+
+    data.append(["Simulated",
+                "Fibre",
+                "SiC",
+                np.min(test_fibre_in_centre[index]),
+                np.max(test_fibre_in_centre[index]),
+                np.mean(test_fibre_in_centre[index]),
+                np.std(test_fibre_in_centre[index])]);
+
+    index = np.nonzero(matrix_mask);
+    data.append(["Theorical",
+                "Matrix",
+                "Ti90Al6V4",
+                13.1274,
+                13.1274,
+                13.1274,
+                0.0]);
+
+    data.append(["Experimental",
+                "Matrix",
+                "Ti90Al6V4",
+                np.min(reference_fibre_in_centre[index]),
+                np.max(reference_fibre_in_centre[index]),
+                np.mean(reference_fibre_in_centre[index]),
+                np.std(reference_fibre_in_centre[index])]);
+
+    data.append(["Simulated",
+                "Matrix",
+                "Ti90Al6V4",
+                np.min(test_fibre_in_centre[index]),
+                np.max(test_fibre_in_centre[index]),
+                np.mean(test_fibre_in_centre[index]),
+                np.std(test_fibre_in_centre[index])]);
+
+    return pd.DataFrame(data,
+            index=None,
+            columns=['CT', 'Structure', "Composition", 'min', 'max', 'mean', 'stddev'])
+```
+
+Get the dataframe with all the values and display it as a table
+
+
+```python
+df = getMuStatistics(reference_fibre_in_centre, test_fibre_in_centre, core_mask, fibre_mask, matrix_mask);
+
+display(df)
+```
+
+
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>CT</th>
+      <th>Structure</th>
+      <th>Composition</th>
+      <th>min</th>
+      <th>max</th>
+      <th>mean</th>
+      <th>stddev</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>Theorical</td>
+      <td>Core</td>
+      <td>W</td>
+      <td>341.610000</td>
+      <td>341.610000</td>
+      <td>341.610000</td>
+      <td>0.000000</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>Experimental</td>
+      <td>Core</td>
+      <td>W</td>
+      <td>120.325119</td>
+      <td>212.735672</td>
+      <td>188.644394</td>
+      <td>16.044947</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>Simulated</td>
+      <td>Core</td>
+      <td>W</td>
+      <td>124.860886</td>
+      <td>205.898849</td>
+      <td>184.559906</td>
+      <td>16.431452</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>Theorical</td>
+      <td>Fibre</td>
+      <td>SiC</td>
+      <td>2.736000</td>
+      <td>2.736000</td>
+      <td>2.736000</td>
+      <td>0.000000</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>Experimental</td>
+      <td>Fibre</td>
+      <td>SiC</td>
+      <td>-32.709003</td>
+      <td>31.958408</td>
+      <td>3.229281</td>
+      <td>6.265201</td>
+    </tr>
+    <tr>
+      <th>5</th>
+      <td>Simulated</td>
+      <td>Fibre</td>
+      <td>SiC</td>
+      <td>-20.269152</td>
+      <td>21.541744</td>
+      <td>2.343601</td>
+      <td>4.582831</td>
+    </tr>
+    <tr>
+      <th>6</th>
+      <td>Theorical</td>
+      <td>Matrix</td>
+      <td>Ti90Al6V4</td>
+      <td>13.127400</td>
+      <td>13.127400</td>
+      <td>13.127400</td>
+      <td>0.000000</td>
+    </tr>
+    <tr>
+      <th>7</th>
+      <td>Experimental</td>
+      <td>Matrix</td>
+      <td>Ti90Al6V4</td>
+      <td>-3.869783</td>
+      <td>25.127810</td>
+      <td>10.860591</td>
+      <td>4.362569</td>
+    </tr>
+    <tr>
+      <th>8</th>
+      <td>Simulated</td>
+      <td>Matrix</td>
+      <td>Ti90Al6V4</td>
+      <td>-3.312125</td>
+      <td>24.084484</td>
+      <td>9.779211</td>
+      <td>3.539471</td>
+    </tr>
+  </tbody>
+</table>
+</div>
