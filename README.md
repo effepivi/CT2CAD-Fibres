@@ -15,7 +15,7 @@ Below is an example of CT slice from an experiment we carried out at the [Europe
 
 In a previous article, on [*Investigation of artefact sources in synchrotron microtomography via virtual X-ray imaging*](https://doi.org/10.1016/j.nimb.2005.02.003) in [Nuclear Instruments and Methods in Physics Research Section B: Beam Interactions with Materials and Atoms](https://www.sciencedirect.com/journal/nuclear-instruments-and-methods-in-physics-research-section-b-beam-interactions-with-materials-and-atoms), we demonstrated that the image above was corrupted by:
 
-1) beam hardening depsite the use of a monochromator,
+1) beam hardening despite the use of a monochromator,
 2) the response of the camera despite the point spread function (PSF) being almost a Dirac, and
 3) phase contrast.
 
