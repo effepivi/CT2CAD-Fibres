@@ -884,14 +884,14 @@ def setMatrix(apGeneSet):
 
 There are 7 successive steps to simulate the XCT data acquisition:
 
-1. Set the fibre and cores geometries and material properties ([see step](#section_mu))
+1. Set the fibre and cores geometries and material properties (Step 39)
 2. Set the matrix geometry and material properties (Step 40)
 3. Simulate the raw projections for each angle:
    - Without phase contrast (Line 5 of Step 45), or
    - With phase contrast (Lines 14-55 of Step 45)
 4. Apply the LSF (Lines 57-60 of Step 45)
 5. Apply the flat-field correction (Step 62)
-6. Add Poison noise (Step~\ref{??})
+6. Add Poisson noise (Step XX)
 7. Apply the minus log normalisation to compute the sinogram (Step 63)
 
 Compute the raw projections and save the data. For this  purpose, we define a new function.
@@ -1497,7 +1497,7 @@ plt.savefig('plots/simulated_CT_slice_with_fibres_after_cube_registration.png');
 
 
 
-## Optimisation of the cores and fibres radii <a id='optim_fibres'></a>
+## Optimisation of the cores and fibres radii
 
 The function below is the objective function used to optimise the radii of the cores and fibres.
 
@@ -3321,7 +3321,7 @@ imgplot3 = ax3.imshow(matrix_mask,
 
 
 
-![png](output_188_0.png)
+![png](doc/output_188_0.png)
 
 
 
