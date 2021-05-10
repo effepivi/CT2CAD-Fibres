@@ -15,7 +15,7 @@ Below is an example of CT slice from an experiment we carried out at the [Europe
 
 In a previous article, on [*Investigation of artefact sources in synchrotron microtomography via virtual X-ray imaging*](https://doi.org/10.1016/j.nimb.2005.02.003) in [Nuclear Instruments and Methods in Physics Research Section B: Beam Interactions with Materials and Atoms](https://www.sciencedirect.com/journal/nuclear-instruments-and-methods-in-physics-research-section-b-beam-interactions-with-materials-and-atoms), we demonstrated that the image above was corrupted by:
 
-1) beam hardening depsite the use of a monochromator,
+1) beam hardening despite the use of a monochromator,
 2) the response of the camera despite the point spread function (PSF) being almost a Dirac, and
 3) phase contrast.
 
@@ -117,25 +117,25 @@ We need some global variables:
 -  `NoneType`: the type of `None`;
 -  `pixel_spacing_in_micrometre`: the physical distance between the centre of two successive pixel;
 -  `pixel_spacing_in_mm`: the physical distance between the centre of two successive pixel;
--  `number_of_projections`: the total number of angles in the sinogram;he total number of angles in the sinogram;
+-  `number_of_projections`: the total number of angles in the sinogram;
 -  `angular_span_in_degrees`: the angular span covered by the sinogram;
 -  `angular_step`: the angular step;
 -  `theta`: the rotation angles in degrees (vertical axis of the sinogram);
 -  `theta_rad`: the rotation angles in radians (vertical axis of the sinogram);
--  `roi_length`: control the size of the ROI when displayng the central fibre;
--  `value_range`: control the binning of the Laplacian kernel
--  `num_samples`: control the binning of the Laplacian kernel
--  `sigma_set`: spread of the Laplacian kernels
--  `k_set`: weight of the Laplacian kernels
--  `label_set`: label of the structures on which a Laplacian kernel is applied
--  `bias`: control the bias of the Poisson noise
--  `gain`: control the gain of the Poisson noise: control the bias of the Poisson noise
--  `scale`: control the scale of the Poisson noise: control the bias of the Poisson noise
+-  `roi_length`: control the size of the ROI when displaying the central fibre;
+-  `value_range`: control the binning support of the Laplacian kernel;
+-  `num_samples`: control the binning size of the Laplacian kernel;
+-  `sigma_set`: spread of the Laplacian kernels;
+-  `k_set`: weight of the Laplacian kernels;
+-  `label_set`: label of the structures on which a Laplacian kernel is applied;
+-  `bias`: control the bias of the Poisson noise;
+-  `gain`: control the gain of the Poisson noise;
+-  `scale`: control the scale of the Poisson noise;
 -  `use_normalisation`: use or do not use zero-mean, unit-variance normalisation in the objective functions;
 -  `use_sinogram`: compute the objective functions on the sinogram or flat-field;
 -  `metrics_type`: type of image comparison used in the objective functions;
--  `fibre_radius`: radius of the SiC fibres in um
--  `core_radius`: radius of the W fibres in um
+-  `fibre_radius`: radius of the SiC fibres in um;
+-  `core_radius`: radius of the W fibres in um;
 
 
 ```python
@@ -247,7 +247,7 @@ In the literature, a projection is often modelled as follows:
 
 with <img src="https://render.githubusercontent.com/render/math?math=I" /> the raw X-ray projection, and with the sample and with the the X-ray beam turned on;
 <img src="https://render.githubusercontent.com/render/math?math=E" /> and <img src="https://render.githubusercontent.com/render/math?math=N" /> the energy in eV and the number of photons at that energy respectively;
-<img src="https://render.githubusercontent.com/render/math?math=i" /> the <img src="https://render.githubusercontent.com/render/math?math=i" />-th material being scanned, <img src="https://render.githubusercontent.com/render/math?math=\mu_i" /> its linear attenuation coefficient in cm<sup>-1</sup> at Energy <img src="https://render.githubusercontent.com/render/math?math=E" />, and
+<img src="https://render.githubusercontent.com/render/math?math=i" /> the <img src="https://render.githubusercontent.com/render/math?math=i" />-th material being scanned, <img src="https://render.githubusercontent.com/render/math?math=\mu_i" /> its linear attenuation coefficient in cm<sup>-1</sup> at energy <img src="https://render.githubusercontent.com/render/math?math=E" />, and
 <img src="https://render.githubusercontent.com/render/math?math=\Delta_i" /> the path length of the ray crossing the <img src="https://render.githubusercontent.com/render/math?math=i" />-th material from the X-ray source to the detector.
 
 <img src="https://render.githubusercontent.com/render/math?math=I_0 = E \times N" />
@@ -544,7 +544,7 @@ plt.savefig('plots/LSF.png');
 
 ## Find circles to identify the centre of fibres
 
-We can use the Hoguh transform to detect where circles are in the image. However, the input image in OpenCV's function must be in UINT. We blur it using a bilateral filter (an edge-preserving smoothing filter).
+We can use the Hough transform to detect where circles are in the image. However, the input image in OpenCV's function must be in UINT. We blur it using a bilateral filter (an edge-preserving smoothing filter).
 
 ### Convert the image to UINT
 
@@ -693,7 +693,7 @@ plt.savefig('plots/fibre_detection_using_otsu_method_after_cleaning.png');
 
 
 
-## Mark each potential tungsten corewith unique label
+## Mark each potential tungsten core with unique label
 
 Each distinct tungsten core is assigned a unique label, i.e. a unique pixel intensity
 
@@ -891,7 +891,7 @@ There are 7 successive steps to simulate the XCT data acquisition:
    - With phase contrast (Lines 14-55 of Step 45)
 4. Apply the LSF (Lines 57-60 of Step 45)
 5. Apply the flat-field correction (Step 62)
-6. Add Poison noise (Step~\ref{??})
+6. Add Poisson noise (Step XX)
 7. Apply the minus log normalisation to compute the sinogram (Step 63)
 
 Compute the raw projections and save the data. For this  purpose, we define a new function.
@@ -928,7 +928,7 @@ def tomographyAcquisition():
     return raw_projections_in_keV;
 ```
 
-### Flat-filed correction
+### Flat-field correction
 
 Because the data suffers from a fixed-pattern noise in X-ray imaging in
 actual experiments, it is necessary to perform the flat-field correction of
@@ -3198,7 +3198,7 @@ plt.legend();
 
 
 
-![png](output_171_0.png)
+![png](doc/output_171_0.png)
 
 
 
@@ -3321,7 +3321,7 @@ imgplot3 = ax3.imshow(matrix_mask,
 
 
 
-![png](output_188_0.png)
+![png](doc/output_188_0.png)
 
 
 
