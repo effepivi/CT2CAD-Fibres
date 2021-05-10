@@ -247,7 +247,7 @@ In the literature, a projection is often modelled as follows:
 
 with <img src="https://render.githubusercontent.com/render/math?math=I" /> the raw X-ray projection, and with the sample and with the the X-ray beam turned on;
 <img src="https://render.githubusercontent.com/render/math?math=E" /> and <img src="https://render.githubusercontent.com/render/math?math=N" /> the energy in eV and the number of photons at that energy respectively;
-<img src="https://render.githubusercontent.com/render/math?math=i" /> the <img src="https://render.githubusercontent.com/render/math?math=i" />-th material being scanned, <img src="https://render.githubusercontent.com/render/math?math=\mu_i" /> its linear attenuation coefficient in cm<sup>-1</sup> at Energy <img src="https://render.githubusercontent.com/render/math?math=E" />, and
+<img src="https://render.githubusercontent.com/render/math?math=i" /> the <img src="https://render.githubusercontent.com/render/math?math=i" />-th material being scanned, <img src="https://render.githubusercontent.com/render/math?math=\mu_i" /> its linear attenuation coefficient in cm<sup>-1</sup> at energy <img src="https://render.githubusercontent.com/render/math?math=E" />, and
 <img src="https://render.githubusercontent.com/render/math?math=\Delta_i" /> the path length of the ray crossing the <img src="https://render.githubusercontent.com/render/math?math=i" />-th material from the X-ray source to the detector.
 
 <img src="https://render.githubusercontent.com/render/math?math=I_0 = E \times N" />
@@ -544,7 +544,7 @@ plt.savefig('plots/LSF.png');
 
 ## Find circles to identify the centre of fibres
 
-We can use the Hoguh transform to detect where circles are in the image. However, the input image in OpenCV's function must be in UINT. We blur it using a bilateral filter (an edge-preserving smoothing filter).
+We can use the Hough transform to detect where circles are in the image. However, the input image in OpenCV's function must be in UINT. We blur it using a bilateral filter (an edge-preserving smoothing filter).
 
 ### Convert the image to UINT
 
@@ -693,7 +693,7 @@ plt.savefig('plots/fibre_detection_using_otsu_method_after_cleaning.png');
 
 
 
-## Mark each potential tungsten corewith unique label
+## Mark each potential tungsten core with unique label
 
 Each distinct tungsten core is assigned a unique label, i.e. a unique pixel intensity
 
@@ -884,7 +884,7 @@ def setMatrix(apGeneSet):
 
 There are 7 successive steps to simulate the XCT data acquisition:
 
-1. Set the fibre and cores geometries and material properties (Step 39)
+1. Set the fibre and cores geometries and material properties ([see step](#section_mu))
 2. Set the matrix geometry and material properties (Step 40)
 3. Simulate the raw projections for each angle:
    - Without phase contrast (Line 5 of Step 45), or
@@ -928,7 +928,7 @@ def tomographyAcquisition():
     return raw_projections_in_keV;
 ```
 
-### Flat-filed correction
+### Flat-field correction
 
 Because the data suffers from a fixed-pattern noise in X-ray imaging in
 actual experiments, it is necessary to perform the flat-field correction of
@@ -1497,7 +1497,7 @@ plt.savefig('plots/simulated_CT_slice_with_fibres_after_cube_registration.png');
 
 
 
-## Optimisation of the cores and fibres radii
+## Optimisation of the cores and fibres radii <a id='optim_fibres'></a>
 
 The function below is the objective function used to optimise the radii of the cores and fibres.
 
