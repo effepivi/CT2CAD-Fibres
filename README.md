@@ -117,25 +117,25 @@ We need some global variables:
 -  `NoneType`: the type of `None`;
 -  `pixel_spacing_in_micrometre`: the physical distance between the centre of two successive pixel;
 -  `pixel_spacing_in_mm`: the physical distance between the centre of two successive pixel;
--  `number_of_projections`: the total number of angles in the sinogram;he total number of angles in the sinogram;
+-  `number_of_projections`: the total number of angles in the sinogram;
 -  `angular_span_in_degrees`: the angular span covered by the sinogram;
 -  `angular_step`: the angular step;
 -  `theta`: the rotation angles in degrees (vertical axis of the sinogram);
 -  `theta_rad`: the rotation angles in radians (vertical axis of the sinogram);
--  `roi_length`: control the size of the ROI when displayng the central fibre;
--  `value_range`: control the binning of the Laplacian kernel
--  `num_samples`: control the binning of the Laplacian kernel
--  `sigma_set`: spread of the Laplacian kernels
--  `k_set`: weight of the Laplacian kernels
--  `label_set`: label of the structures on which a Laplacian kernel is applied
--  `bias`: control the bias of the Poisson noise
--  `gain`: control the gain of the Poisson noise: control the bias of the Poisson noise
--  `scale`: control the scale of the Poisson noise: control the bias of the Poisson noise
+-  `roi_length`: control the size of the ROI when displaying the central fibre;
+-  `value_range`: control the binning support of the Laplacian kernel;
+-  `num_samples`: control the binning size of the Laplacian kernel;
+-  `sigma_set`: spread of the Laplacian kernels;
+-  `k_set`: weight of the Laplacian kernels;
+-  `label_set`: label of the structures on which a Laplacian kernel is applied;
+-  `bias`: control the bias of the Poisson noise;
+-  `gain`: control the gain of the Poisson noise;
+-  `scale`: control the scale of the Poisson noise;
 -  `use_normalisation`: use or do not use zero-mean, unit-variance normalisation in the objective functions;
 -  `use_sinogram`: compute the objective functions on the sinogram or flat-field;
 -  `metrics_type`: type of image comparison used in the objective functions;
--  `fibre_radius`: radius of the SiC fibres in um
--  `core_radius`: radius of the W fibres in um
+-  `fibre_radius`: radius of the SiC fibres in um;
+-  `core_radius`: radius of the W fibres in um;
 
 
 ```python
