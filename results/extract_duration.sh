@@ -153,7 +153,7 @@ do
         # LAPLACIAN_LSF_IND=`echo $LAPLACIAN_LSF_FEVAL / $LAPLACIAN_LSF_ITER | bc`
 
 
-        STATS=`python3 ./imageStats.py $CT_slice_file`
+        STATS=`python3 ../tutorial/fbp_scipy_recons.mha ./imageStats.py $CT_slice_file`
 
 
         MEAN_CORE_REF=`grep "After noise CORE REF (MIN, MEDIAN, MAX, MEAN, STDDEV)" run_SCW_$i/optimisation-$i.out | cut -d " " -f 13`
