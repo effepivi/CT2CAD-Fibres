@@ -1,0 +1,7 @@
+- repo: https://github.com/nbQA-dev/nbQA
+  rev: 0.8.0
+  hooks:
+    - id: nbqa-flake8
+    - id: nbqa-isort
+    - id: nbqa-mypy
+    - id: nbqa-black

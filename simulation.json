@@ -36,14 +36,14 @@
   "Samples": [
     {
       "Label": "cores",
-      "Path": "Tutorial2/outputs/core.stl",
+      "Path": "tutorial/outputs/core.stl",
       "Unit": "mm",
       "Material": ["Element", "W"]
     },
 
     {
       "Label": "fibres",
-      "Path": "Tutorial2/outputs/fibre.stl",
+      "Path": "tutorial/outputs/fibre.stl",
       "Unit": "mm",
       "Material": ["Compound", "SiC"],
       "Density": 3.2
@@ -51,7 +51,7 @@
 
     {
       "Label": "matrix",
-      "Path": "Tutorial2/outputs/matrix.stl",
+      "Path": "tutorial/outputs/matrix.stl",
       "Unit": "mm",
       "Material": ["Mixture", "Ti90Al6V4"],
       "Density": 4.42
