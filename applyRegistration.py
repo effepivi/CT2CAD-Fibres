@@ -914,8 +914,8 @@ setMatrix(matrix_geometry_parameters);
 # Load the cores and fibres
 setFibres(centroid_set);
 
-# gvxr.saveSTLfile("fibre", output_directory + "/fibre1_fibre.stl");
-# gvxr.saveSTLfile("core",  output_directory + "/fibre1_core.stl");
+gvxr.saveSTLfile("fibre", output_directory + "/fibre1_fibre.stl");
+gvxr.saveSTLfile("core",  output_directory + "/fibre1_core.stl");
 
 print("Core diameter:", round(core_radius * 2), "um");
 print("Fibre diameter:", round(fibre_radius * 2), "um");
@@ -1022,6 +1022,7 @@ setMatrix(matrix_geometry_parameters);
 
 # Load the cores and fibres
 setFibres(centroid_set);
+
 
 # gvxr.saveSTLfile("fibre", output_directory + "/fibre2_fibre.stl");
 # gvxr.saveSTLfile("core",  output_directory + "/fibre2_core.stl");
@@ -1212,6 +1213,10 @@ setFibres(centroid_set);
 
 # gvxr.saveSTLfile("fibre", output_directory + "/laplacian1_fibre.stl");
 # gvxr.saveSTLfile("core",  output_directory + "/laplacian1_core.stl");
+
+gvxr.saveSTLfile("matrix", output_directory + "/matrix_final.stl");
+gvxr.saveSTLfile("fibre", output_directory + "/fibres_final.stl");
+gvxr.saveSTLfile("core",  output_directory + "/cores_final.stl");
 
 print("Core diameter:", round(core_radius * 2), "um");
 print("Fibre diameter:", round(fibre_radius * 2), "um");
