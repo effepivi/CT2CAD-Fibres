@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "objective,i,MATRIX_ZNCC,FIBRE1_ZNCC,FIBRE2_ZNCC,FIBRE3_ZNCC,HARMONICS_ZNCC,NOISE_ZNCC,LAPLACIAN1_ZNCC,LAPLACIAN_LSF_ZNCC,CUBE1_RUNTIME (in min),FIBRES1_RUNTIME (in min),FIBRES3_RUNTIME (in min),HARMONICS_RUNTIME (in min),NOISE_RUNTIME (in min),LAPLACIAN1_RUNTIME (in min),LAPLACIAN_LSF_RUNTIME (in min),OVERALL_RUNTIME (in min),CUBE1_RUNTIME (in hh:mm:ss),FIBRES1_RUNTIME (in hh:mm:ss),FIBRES3_RUNTIME (in hh:mm:ss),HARMONICS_RUNTIME (in hh:mm:ss),NOISE_RUNTIME (in hh:mm:ss),LAPLACIAN1_RUNTIME (in hh:mm:ss),LAPLACIAN_LSF_RUNTIME (in hh:mm:ss),OVERALL_RUNTIME (in hh:mm:ss),X1 (in um),Y1 (in um),ROT1 (in degree),W1 (in um),H1 (in um),RADIUS1_CORE (in um),RADIUS1_FIBRE (in um),RADIUS1_CORE_PX (in pixels),RADIUS1_FIBRE_PX (in pixels),RADIUS3_CORE (in um),RADIUS3_FIBRE (in um),RADIUS3_CORE_PX (in pixels),RADIUS3_FIBRE_PX (in pixels),33keV_WEIGHT,66keV_WEIGHT,99keV_WEIGHT,NOISE_BIAS,NOISE_GIAN,NOISE_SCALE,LAPLACIAN1_SIGMA_CORE,LAPLACIAN1_K_CORE,LAPLACIAN1_SIGMA_FIBRE,LAPLACIAN1_K_FIBRE,LAPLACIAN1_SIGMA_MATRIX,LAPLACIAN1_K_MATRIX,LAPLACIAN1_RADIUS_CORE (in um),LAPLACIAN1_RADIUS_FIBRE (in um),LAPLACIAN1_RADIUS_CORE_PX (in pixels),LAPLACIAN1_RADIUS_FIBRE_PX (in pixels),LAPLACIAN_LSF_K_CORE,LAPLACIAN_LSF_K_FIBRE,LSF_a,LSF_b,LSF_c,LSF_d,LSF_e,LSF_f,LAPLACIAN_LSF_K_MATRIX,MEAN_CORE_REF,MEAN_CORE_SIM,STDDEV_CORE_REF,STDDEV_CORE_SIM,MEAN_FIBRE_REF,MEAN_FIBRE_SIM,STDDEV_FIBRE_REF,STDDEV_FIBRE_SIM,MEAN_MATRIX_REF,MEAN_MATRIX_SIM,STDDEV_MATRIX_REF,STDDEV_MATRIX_SIM"
+echo "objective,i,MATRIX_ZNCC,FIBRE1_ZNCC,FIBRE2_ZNCC,FIBRE3_ZNCC,HARMONICS_ZNCC,NOISE_ZNCC,LAPLACIAN1_ZNCC,LAPLACIAN_LSF_ZNCC,CUBE1_RUNTIME (in min),FIBRES1_RUNTIME (in min),FIBRES3_RUNTIME (in min),HARMONICS_RUNTIME (in min),NOISE_RUNTIME (in min),LAPLACIAN1_RUNTIME (in min),LAPLACIAN_LSF_RUNTIME (in min),OVERALL_RUNTIME (in min),CUBE1_RUNTIME (in hh:mm:ss),FIBRES1_RUNTIME (in hh:mm:ss),FIBRES3_RUNTIME (in hh:mm:ss),HARMONICS_RUNTIME (in hh:mm:ss),NOISE_RUNTIME (in hh:mm:ss),LAPLACIAN1_RUNTIME (in hh:mm:ss),LAPLACIAN_LSF_RUNTIME (in hh:mm:ss),OVERALL_RUNTIME (in hh:mm:ss),X1 (in um),Y1 (in um),ROT1 (in degree),W1 (in um),H1 (in um),RADIUS1_CORE (in um),RADIUS1_FIBRE (in um),RADIUS1_CORE_PX (in pixels),RADIUS1_FIBRE_PX (in pixels),RADIUS3_CORE (in um),RADIUS3_FIBRE (in um),RADIUS3_CORE_PX (in pixels),RADIUS3_FIBRE_PX (in pixels),33keV_WEIGHT,66keV_WEIGHT,99keV_WEIGHT,NOISE_BIAS,NOISE_GIAN,NOISE_SCALE,LAPLACIAN1_SIGMA_CORE,LAPLACIAN1_K_CORE,LAPLACIAN1_SIGMA_FIBRE,LAPLACIAN1_K_FIBRE,LAPLACIAN1_SIGMA_MATRIX,LAPLACIAN1_K_MATRIX,LAPLACIAN1_RADIUS_CORE (in um),LAPLACIAN1_RADIUS_FIBRE (in um),LAPLACIAN1_RADIUS_CORE_PX (in pixels),LAPLACIAN1_RADIUS_FIBRE_PX (in pixels),LAPLACIAN_LSF_K_CORE,LAPLACIAN_LSF_K_FIBRE,LAPLACIAN_LSF_K_MATRIX,LSF_a,LSF_b,LSF_c,LSF_d,LSF_e,LSF_f,MEAN_CORE_REF,MEAN_CORE_SIM,STDDEV_CORE_REF,STDDEV_CORE_SIM,MEAN_FIBRE_REF,MEAN_FIBRE_SIM,STDDEV_FIBRE_REF,STDDEV_FIBRE_SIM,MEAN_MATRIX_REF,MEAN_MATRIX_SIM,STDDEV_MATRIX_REF,STDDEV_MATRIX_SIM"
 
 for i in {1..25}
 do
@@ -28,6 +28,14 @@ do
         LAPLACIAN1_RUNTIME=`grep "Laplacian1 execution time" run_SCW_$i/optimisation-$i.out | cut -d ":" -f 2  -`
         LAPLACIAN_LSF_RUNTIME=`grep "Laplacian2 execution time" run_SCW_$i/optimisation-$i.out | cut -d ":" -f 2  -`
         NOISE_RUNTIME=`grep "Noise execution time" run_SCW_$i/optimisation-$i.out | cut -d ":" -f 2  -`
+
+        CUBE1_RUNTIME=`echo "$CUBE1_RUNTIME/60.0" | bc -l`
+        FIBRES1_RUNTIME=`echo "$FIBRES1_RUNTIME/60.0" | bc -l`
+        FIBRES3_RUNTIME=`echo "$FIBRES3_RUNTIME/60.0" | bc -l`
+        HARMONICS_RUNTIME=`echo "$HARMONICS_RUNTIME/60.0" | bc -l`
+        LAPLACIAN1_RUNTIME=`echo "$LAPLACIAN1_RUNTIME/60.0" | bc -l`
+        LAPLACIAN_LSF_RUNTIME=`echo "$LAPLACIAN_LSF_RUNTIME/60.0" | bc -l`
+        NOISE_RUNTIME=`echo "$NOISE_RUNTIME/60.0" | bc -l`
 
         OVERALL_RUNTIME=`echo $CUBE1_RUNTIME + $FIBRES1_RUNTIME + $FIBRES3_RUNTIME + $HARMONICS_RUNTIME + $LAPLACIAN1_RUNTIME + $LAPLACIAN_LSF_RUNTIME + $NOISE_RUNTIME |bc -l`
 
@@ -115,8 +123,8 @@ do
         LSF_b=`echo $LAPLACIAN_LSF_PARAMS | cut -d " " -f 9  -`
         LSF_c=`echo $LAPLACIAN_LSF_PARAMS | cut -d " " -f 10  -`
         LSF_d=`echo $LAPLACIAN_LSF_PARAMS | cut -d " " -f 11  -`
-        LSF_e=`echo $LAPLACIAN_LSF_PARAMS | cut -d " " -f 13  -`
-        LSF_f=`echo $LAPLACIAN_LSF_PARAMS | cut -d " " -f 14  -`
+        LSF_e=`echo $LAPLACIAN_LSF_PARAMS | cut -d " " -f 12  -`
+        LSF_f=`echo $LAPLACIAN_LSF_PARAMS | cut -d " " -f 13  -`
 
         NOISE_PARAMS=`cat run_SCW_$i/poisson-noise.dat`
         NOISE_BIAS=`echo $NOISE_PARAMS | cut -d " " -f 5  -`
@@ -153,26 +161,24 @@ do
         # LAPLACIAN_LSF_IND=`echo $LAPLACIAN_LSF_FEVAL / $LAPLACIAN_LSF_ITER | bc`
 
 
-        STATS=`python3 ../tutorial/fbp_scipy_recons.mha ./imageStats.py $CT_slice_file`
+         STATS=`python3 ../imageStats.py ../../tutorial/fbp_scipy_recons.mha  $CT_slice_file`
+        MEAN_CORE_REF=`echo $STATS | cut -d " " -f 1`
+        STDDEV_CORE_REF=`echo $STATS | cut -d " " -f 2`
 
+        MEAN_CORE_SIM=`echo $STATS | cut -d " " -f 3`
+        STDDEV_CORE_SIM=`echo $STATS | cut -d " " -f 4`
 
-        MEAN_CORE_REF=`grep "After noise CORE REF (MIN, MEDIAN, MAX, MEAN, STDDEV)" run_SCW_$i/optimisation-$i.out | cut -d " " -f 13`
-        STDDEV_CORE_REF=`grep "After noise CORE REF (MIN, MEDIAN, MAX, MEAN, STDDEV)" run_SCW_$i/optimisation-$i.out | cut -d " " -f 14`
+        MEAN_FIBRE_REF=`echo $STATS | cut -d " " -f 5`
+        STDDEV_FIBRE_REF=`echo $STATS | cut -d " " -f 6`
 
-        MEAN_CORE_SIM=`grep "After noise CORE SIMULATED (MIN, MEDIAN, MAX, MEAN, STDDEV)" run_SCW_$i/optimisation-$i.out | cut -d " " -f 13`
-        STDDEV_CORE_SIM=`grep "After noise CORE SIMULATED (MIN, MEDIAN, MAX, MEAN, STDDEV)" run_SCW_$i/optimisation-$i.out | cut -d " " -f 14`
+        MEAN_FIBRE_SIM=`echo $STATS | cut -d " " -f 7`
+        STDDEV_FIBRE_SIM=`echo $STATS | cut -d " " -f 8`
 
-        MEAN_FIBRE_REF=`grep "After noise FIBRE REF (MIN, MEDIAN, MAX, MEAN, STDDEV)" run_SCW_$i/optimisation-$i.out | cut -d " " -f 13`
-        STDDEV_FIBRE_REF=`grep "After noise FIBRE REF (MIN, MEDIAN, MAX, MEAN, STDDEV)" run_SCW_$i/optimisation-$i.out | cut -d " " -f 14`
+        MEAN_MATRIX_REF=`echo $STATS | cut -d " " -f 9`
+        STDDEV_MATRIX_REF=`echo $STATS | cut -d " " -f 10`
 
-        MEAN_FIBRE_SIM=`grep "After noise FIBRE SIMULATED (MIN, MEDIAN, MAX, MEAN, STDDEV)" run_SCW_$i/optimisation-$i.out | cut -d " " -f 13`
-        STDDEV_FIBRE_SIM=`grep "After noise FIBRE SIMULATED (MIN, MEDIAN, MAX, MEAN, STDDEV)" run_SCW_$i/optimisation-$i.out | cut -d " " -f 14`
-
-        MEAN_MATRIX_REF=`grep "After noise MATRIX REF (MIN, MEDIAN, MAX, MEAN, STDDEV)" run_SCW_$i/optimisation-$i.out | cut -d " " -f 13`
-        STDDEV_MATRIX_REF=`grep "After noise MATRIX REF (MIN, MEDIAN, MAX, MEAN, STDDEV)" run_SCW_$i/optimisation-$i.out | cut -d " " -f 14`
-
-        MEAN_MATRIX_SIM=`grep "After noise MATRIX SIMULATED (MIN, MEDIAN, MAX, MEAN, STDDEV)" run_SCW_$i/optimisation-$i.out | cut -d " " -f 13`
-        STDDEV_MATRIX_SIM=`grep "After noise MATRIX SIMULATED (MIN, MEDIAN, MAX, MEAN, STDDEV)" run_SCW_$i/optimisation-$i.out | cut -d " " -f 14`
+        MEAN_MATRIX_SIM=`echo $STATS | cut -d " " -f 11`
+        STDDEV_MATRIX_SIM=`echo $STATS | cut -d " " -f 12`
 
 
 
@@ -180,7 +186,7 @@ do
         cols=`echo $cols+1|bc`
 
         echo `pwd |cut -d "/" -f $cols`,$i,$MATRIX_ZNCC,$FIBRE1_ZNCC,$FIBRE2_ZNCC,$FIBRE3_ZNCC,$HARMONICS_ZNCC,$NOISE_ZNCC,$LAPLACIAN1_ZNCC,$LAPLACIAN_LSF_ZNCC,$CUBE1_RUNTIME,$FIBRES1_RUNTIME,$FIBRES3_RUNTIME,$HARMONICS_RUNTIME,$NOISE_RUNTIME,$LAPLACIAN1_RUNTIME,$LAPLACIAN_LSF_RUNTIME,$OVERALL_RUNTIME,$CUBE1_RUNTIME_DAYS,$FIBRES1_RUNTIME_DAYS,$FIBRES3_RUNTIME_DAYS,$HARMONICS_RUNTIME_DAYS,$NOISE_RUNTIME_DAYS,$LAPLACIAN1_RUNTIME_DAYS,$LAPLACIAN_LSF_RUNTIME_DAYS,$OVERALL_RUNTIME_DAYS,$X1,$Y1,$ROT1,$W1,$H1,$RADIUS1_CORE,$RADIUS1_FIBRE,$RADIUS1_CORE_PX,$RADIUS1_FIBRE_PX,$RADIUS3_CORE,$RADIUS3_FIBRE,$RADIUS3_CORE_PX,$RADIUS3_FIBRE_PX,`sed -n '2p' < run_SCW_$i/spectrum1.dat`,`sed -n '3p' < run_SCW_$i/spectrum1.dat`,`sed -n '4p' < run_SCW_$i/spectrum1.dat`,$NOISE_BIAS,$NOISE_GIAN,$NOISE_SCALE,$LAPLACIAN1_SIGMA_CORE,$LAPLACIAN1_K_CORE,$LAPLACIAN1_SIGMA_FIBRE,$LAPLACIAN1_K_FIBRE,$LAPLACIAN1_SIGMA_MATRIX,$LAPLACIAN1_K_MATRIX,$LAPLACIAN1_RADIUS_CORE,$LAPLACIAN1_RADIUS_FIBRE,$LAPLACIAN1_RADIUS_CORE_PX,$LAPLACIAN1_RADIUS_FIBRE_PX,$LAPLACIAN_LSF_K_CORE,$LAPLACIAN_LSF_K_FIBRE,$LAPLACIAN_LSF_K_MATRIX,$LSF_a,$LSF_b,$LSF_c,$LSF_d,$LSF_e,$LSF_f,$MEAN_CORE_REF,$MEAN_CORE_SIM,$STDDEV_CORE_REF,$STDDEV_CORE_SIM,$MEAN_FIBRE_REF,$MEAN_FIBRE_SIM,$STDDEV_FIBRE_REF,$STDDEV_FIBRE_SIM,$MEAN_MATRIX_REF,$MEAN_MATRIX_SIM,$STDDEV_MATRIX_REF,$STDDEV_MATRIX_SIM#,$STATS
-    #else
-    #    echo `pwd |cut -d "/" -f $cols`,$i,MISSING
+    else
+       echo `pwd |cut -d "/" -f $cols`,$i,MISSING
     fi
 done
