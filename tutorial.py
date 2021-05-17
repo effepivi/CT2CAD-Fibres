@@ -122,9 +122,7 @@ if not os.path.exists(output_directory):
     os.makedirs(output_directory);
 
 
-metrics_type = args.metrics[0];
-use_normalisation = args.normalisation;
-use_sinogram = args.sinogram;
+
 
 
 # ## Global variables
@@ -165,11 +163,32 @@ bias = None;
 gain = None;
 scale = None;
 
-use_normalisation = True;
-use_sinogram = True;
+metrics_type = args.metrics[0];
+use_normalisation = args.normalisation;
+use_sinogram = args.sinogram;
 
 fibre_radius = 140 / 2; # um
 core_radius = 30 / 2; # um
+
+
+print("Command line arguments:")
+for arg in sys.argv:
+    print("\t", arg)
+
+print("Metrics used in objective function:", metrics_type)
+
+if use_normalisation:
+    print("Use zero-mean, unit-variance normalisation")
+else:
+    print("Do not use zero-mean, unit-variance normalisation")
+
+if use_sinogram:
+    print("Use projections data with minus log linearisation (i.e. use the sinogram)")
+else:
+    print("Use projections data without minus log linearisation (i.e. use the projections after flat-field correction)")
+
+
+
 
 
 # ## Load the image data
