@@ -6,11 +6,11 @@ export ITK_GLOBAL_NUMBER_OF_THREADS=16
 #MAIN_DIR=/data/id19/bones3/simon/phantom_0.7um_20.5_1_
 #OUTPUT_DIR=/tmp
 
-SPACING=0.0019 # in mm
-SID=`echo 140*1000 |bc` # in mm
-SDD=`echo $SID-80 |bc`  # in mm
+SPACING=0.5 #0019 # in mm
+SID=0. #`echo 140*1000 |bc` # in mm
+SDD=0. #`echo $SID+80 |bc`  # in mm
 DETECTOR_WIDTH=1024 # in px
-DETECTOR_HEIGHT=1 # in px
+DETECTOR_HEIGHT=10 # in px
 ORIGIN=`echo $DETECTOR_WIDTH*$SPACING/2.-$SPACING/2. | bc -l` 
 
 
@@ -30,7 +30,7 @@ rtksimulatedgeometry \
 
 
 rtkfdk -p . \
-       -r projections.mha \
+       -r projections_3d.mha \
        -g $PWD/geometry \
        -o $PWD/fdk.mha \
        --lowmem \
@@ -39,7 +39,7 @@ rtkfdk -p . \
        --origin -$ORIGIN,-$ORIGIN,0. \
        --verbose \
        --direction 1,0,0,0,0,1,0,1,0 \
-       --hardware cpu
+       --hardware cuda
 
 exit
 clitkImageArithm \
