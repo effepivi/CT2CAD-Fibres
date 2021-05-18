@@ -6,7 +6,7 @@ import math
 import pandas as pd
 
 import matplotlib
-matplotlib.use('Qt5Agg')
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
@@ -17,6 +17,7 @@ from skimage.util import compare_images
 
 import SimpleITK as sitk
 
+NoneType = type(None)
 # # Fixing random state for reproducibility
 # np.random.seed(19680801)
 #
@@ -144,7 +145,7 @@ def printDuration(column):
     print("\end{tabular}")
 
 
-def boxplot(column, column_order, ylabel, multiplier=1.0):
+def boxplot(column, column_order, ylabel, multiplier=1.0, limits=None):
 
     fig1, ax1 = plt.subplots()
     #ax1.set_title(column)
@@ -195,12 +196,15 @@ def boxplot(column, column_order, ylabel, multiplier=1.0):
     labels = np.array(labels);
 
     #ax1.boxplot((y_data.T)[order])
-    ax1.boxplot((y_data.T))
+    ax1.boxplot((y_data.T), notch=True,showfliers=False)
     #plt.xticks(ticks=ticks, labels=labels[order], rotation=45, ha='right');
     plt.xticks(ticks=ticks, labels=labels, rotation=45, ha='right');
     plt.subplots_adjust(bottom=0.25)
     plt.ylabel(ylabel);
     # plt.title(column);
+
+    if not isinstance(limits, NoneType):
+        plt.ylim(limits)
 
     xcoords = [4.5, 8.5, 10.5]
     for xc in xcoords:
@@ -276,85 +280,81 @@ def ttest(column):
 
     return best_objective, equivalent_objective, p_value_set;
 
+def drawProfiles(objectives, colours, labels):
+    fig1, ax = plt.subplots()
+    ref_not_plotted = False;
+    for objective, colour, label in zip(objectives, colours, labels):
+
+        selection = df["objective"] == objective;
+        idxmin = df[selection]["LAPLACIAN_LSF_ZNCC"].idxmin();
+        idxmax = df[selection]["LAPLACIAN_LSF_ZNCC"].idxmax();
+
+        # if df[selection]['LAPLACIAN_LSF_ZNCC'].count() != 15:
+        #     print("MISSING DATA FOR", objective)
+        #     exit();
+        median_value = df[selection]['LAPLACIAN_LSF_ZNCC'].median();
+        for row_id, row_ZNCC in zip(df[selection]['i'], df[selection]['LAPLACIAN_LSF_ZNCC']):
+
+            if row_ZNCC == median_value:
+                idxmedian = row_id;
+
+        offset = 30;
+
+        print(objective, df["i"][idxmin], idxmedian, df["i"][idxmax])
+        if not ref_not_plotted:
+            ref_CT = sitk.ReadImage("../tutorial/fbp_scipy_recons.mha")
+            ref = np.diag(sitk.GetArrayFromImage(ref_CT)[0][505 - offset:505 + offset + 1,501 - offset:501 + offset + 1])
+            plt.plot(np.array(range(len(ref))) * 1.9, ref, "k-", label="Real CT");
+            ref_not_plotted = True;
+
+        # Load simulated slice
+        simulated_CT = sitk.ReadImage(objective + "/run_SCW_" + str(df["i"][idxmin]) + "/simulated_CT_before_noise.mha")
+        sim = np.diag(sitk.GetArrayFromImage(simulated_CT)[505 - offset:505 + offset + 1,501 - offset:501 + offset + 1])
+        plt.plot(np.array(range(len(sim))) * 1.9, sim, colour + "--", label="Worse run for " + label);
+
+        simulated_CT = sitk.ReadImage(objective + "/run_SCW_" + str(df["i"][idxmedian]) + "/simulated_CT_before_noise.mha")
+        sim = np.diag(sitk.GetArrayFromImage(simulated_CT)[505 - offset:505 + offset + 1,501 - offset:501 + offset + 1])
+        plt.plot(np.array(range(len(sim))) * 1.9, sim, colour + ":", label="Median run for " + label);
+
+        simulated_CT = sitk.ReadImage(objective + "/run_SCW_" + str(df["i"][idxmax]) + "/simulated_CT_before_noise.mha")
+        sim = np.diag(sitk.GetArrayFromImage(simulated_CT)[505 - offset:505 + offset + 1,501 - offset:501 + offset + 1])
+        plt.plot(np.array(range(len(sim))) * 1.9, sim, colour + "-.", label="Best run for " + label);
 
 
+    plt.xlabel("Distance (in $\mathrm{\mu}$m)");
+    plt.ylabel("Linear attenuation coefficients (in cm$^{-1}$)");
 
-fig1, ax = plt.subplots()
-ref_not_plotted = False;
-for objective, colour, label in zip(["FULL_REGISTRATION_SINOGRAM_PARTIAL_NORMALISED_RMSE", "FULL_REGISTRATION_PROJS_PARTIAL_NORMALISED_DSSIM"],
+    plt.legend(loc='best');
+
+    plt.tight_layout();
+    plt.savefig("profiles.pdf");
+
+    plt.show()
+
+def drawScatterPlots(objectives, colours, labels):
+    fig1, ax1 = plt.subplots()
+    plt.xlabel("ZNCC (in %)");
+    plt.ylabel("Runtime (in min)");
+
+    for objective, colour, label in zip(objectives, colours, labels):
+        selection = df["objective"] == objective;
+
+        plt.scatter(df[selection]["LAPLACIAN_LSF_ZNCC"], df[selection]["OVERALL_RUNTIME (in min)"], color=colour, label=label)
+
+    plt.legend(loc='lower center', bbox_to_anchor=(.5, -0.5));
+
+
+    plt.tight_layout();
+    plt.savefig("scatter_plot.pdf");
+
+
+drawProfiles(["FULL_REGISTRATION_SINOGRAM_PARTIAL_NORMALISED_RMSE", "FULL_REGISTRATION_SINOGRAM_PARTIAL_NORMALISED_DSSIM"],
         ["g", "r"],
-        ["RMSE on sinogram\nwith normalisation", "DSSIM on projections\nwith normalisation"]):
+        ["RMSE on sinogram\nwith normalisation", "DSSIM on projections\nwith normalisation"])
 
-    selection = df["objective"] == objective;
-    idxmin = df[selection]["LAPLACIAN_LSF_ZNCC"].idxmin();
-    idxmax = df[selection]["LAPLACIAN_LSF_ZNCC"].idxmax();
-
-    # if df[selection]['LAPLACIAN_LSF_ZNCC'].count() != 15:
-    #     print("MISSING DATA FOR", objective)
-    #     exit();
-    median_value = df[selection]['LAPLACIAN_LSF_ZNCC'].median();
-    for row_id, row_ZNCC in zip(df[selection]['i'], df[selection]['LAPLACIAN_LSF_ZNCC']):
-
-        if row_ZNCC == median_value:
-            idxmedian = row_id;
-
-    print(objective, df["i"][idxmin], idxmedian, df["i"][idxmax])
-    if not ref_not_plotted:
-        fname = objective + "/run_SCW_" + str(df["i"][idxmin]) + "/profile_reference_fibre_in_centre.txt";
-        ref=np.loadtxt(fname);
-        plt.plot(np.array(range(len(ref))) * 1.9, ref, "k-", label="Real CT");
-        ref_not_plotted = True;
-
-    fname = objective + "/run_SCW_" + str(df["i"][idxmin]) + "/profile_simulated_fibre_in_centre_after_noise.txt";
-    sim=np.loadtxt(fname);
-    plt.plot(np.array(range(len(sim))) * 1.9, sim, colour + "--", label="Worse run for " + label);
-
-    fname = objective + "/run_SCW_" + str(idxmedian) + "/profile_simulated_fibre_in_centre_after_noise.txt";
-    sim=np.loadtxt(fname);
-    plt.plot(np.array(range(len(sim))) * 1.9, sim, colour + ":", label="Median run for " + label);
-
-    fname = objective + "/run_SCW_" + str(df["i"][idxmax]) + "/profile_simulated_fibre_in_centre_after_noise.txt";
-    sim=np.loadtxt(fname);
-    plt.plot(np.array(range(len(sim))) * 1.9, sim, colour + "-.", label="Best run for " + label);
-
-
-plt.xlabel("Distance (in $\mathrm{\mu}$m)");
-plt.ylabel("Linear attenuation coefficients (in cm$^{-1}$)");
-
-plt.legend(loc='best');
-
-plt.tight_layout();
-plt.savefig("profiles.pdf");
-
-plt.show()
-
-
-
-
-
-
-
-
-
-
-
-fig1, ax1 = plt.subplots()
-plt.xlabel("ZNCC (in %)");
-plt.ylabel("Runtime (in min)");
-
-for objective, colour, label in zip(
-        ["FULL_REGISTRATION_SINOGRAM_PARTIAL_NORMALISED_MAE", "FULL_REGISTRATION_SINOGRAM_PARTIAL_NORMALISED_RMSE", "FULL_REGISTRATION_PROJS_PARTIAL_NORMALISED_DSSIM"],
+drawScatterPlots(["FULL_REGISTRATION_SINOGRAM_PARTIAL_NORMALISED_MAE", "FULL_REGISTRATION_SINOGRAM_PARTIAL_NORMALISED_RMSE", "FULL_REGISTRATION_SINOGRAM_PARTIAL_NORMALISED_DSSIM"],
         ["blue", "green", "red"],
-        ["MAE on sinogram with normalisation", "RMSE on sinogram with normalisation", "DSSIM on projections with normalisation"]):
-    selection = df["objective"] == objective;
-
-    plt.scatter(df[selection]["LAPLACIAN_LSF_ZNCC"], df[selection]["OVERALL_RUNTIME (in min)"], color=colour, label=label)
-
-plt.legend(loc='lower center', bbox_to_anchor=(.5, -0.5));
-
-
-plt.tight_layout();
-plt.savefig("scatter_plot.pdf");
+        ["MAE on sinogram with normalisation", "RMSE on sinogram with normalisation", "DSSIM on projections with normalisation"])
 
 
 
@@ -467,7 +467,7 @@ print("LSF + Phase contrast")
 print("********************************************************************************")
 
 best_objective, equivalent_objective, p_value_set = ttest("LAPLACIAN_LSF_ZNCC");
-boxplot("LAPLACIAN_LSF_ZNCC", "LAPLACIAN_LSF_ZNCC", "ZNCC in %", 1.0);
+boxplot("LAPLACIAN_LSF_ZNCC", "LAPLACIAN_LSF_ZNCC", "ZNCC in %", 1.0, (80,95));
 printZNCC("LAPLACIAN_LSF_ZNCC", best_objective, equivalent_objective, p_value_set);
 print()
 print()
