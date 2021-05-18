@@ -23,6 +23,8 @@ That study was published in 2005, when computer were still relatively slow. Sinc
 
 ## Registration steps
 
+![Registration pipeline](./doc/pipeline.svg)
+
 1. Initialisation
     - [Import Python packages](#Import-packages)
     - [Global variables](#Global-variables) with values corresponding to known parameters
@@ -33,14 +35,14 @@ That study was published in 2005, when computer were still relatively slow. Sinc
     - [LSF](#The-LSF)
     - [Find circles to identify the centre of fibres](#Find-circles-to-identify-the-centre-of-fibres)
 2. [Simulate the CT acquisition](#Simulate-the-CT-acquisition)
-3. [Registration of a cube](#Registration-of-a-cube)
+3. [Register the Ti90Al6V4 matrix](#Registration-of-a-cube)
 4. [Optimisation of the cores and fibres radii](#Optimisation-of-the-cores-and-fibres-radii)
 5. [Recentre each core/fibre](#Recentre-each-core/fibre)
 6. [Optimisation the radii after recentring](#Optimisation-the-radii-after-recentring)
 7. [Optimisation of the beam spectrum](#Optimisation-of-the-beam-spectrum)
-8. [Optimisation of the Poisson noise](#Optimisation-of-the-Poisson-noise)
-9. [Optimisation of the phase contrast and the radii](#Optimisation-of-the-phase-contrast-and-the-radii)
-10. [Optimisation of the phase contrast and the LSF](#Optimisation-of-the-phase-contrast-and-the-LSF)
+8. [Optimisation of the phase contrast and the radii](#Optimisation-of-the-phase-contrast-and-the-radii)
+9. [Optimisation of the phase contrast and the LSF](#Optimisation-of-the-phase-contrast-and-the-LSF)
+10. [Optimisation of the Poisson noise](#Optimisation-of-the-Poisson-noise)
 11. [Results in terms of linear attenuation coefficients](#Results-in-terms-of-linear-attenuation-coefficients)
 
 ## Import packages
