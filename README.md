@@ -45,6 +45,18 @@ That study was published in 2005, when computer were still relatively slow. Sinc
 10. [Optimisation of the Poisson noise](#Optimisation-of-the-Poisson-noise)
 11. [Results in terms of linear attenuation coefficients](#Results-in-terms-of-linear-attenuation-coefficients)
 
+In image registration, a *moving object* is geometrically deformed so that its image matches a *target image*. 
+The parameters of the deformation is controlled and iteratively tuned by an optimisation algorithm. 
+
+![Registration flowchart](doc/registration.svg)
+
+In our context, the target is the sinogram provided by the experiment at ESRF. 
+The moving image is created by simulation using the CAD models and [gVirtualXRay](https://sourceforge.net/projects/gvirtualxray/). 
+The simulation parameters controlling the CAD models are repetitively tuned by a global optimisation algorithm until a stopping criterion is met. 
+The optimisation algorithm will minimise (or maximise) a numerical value, the *objective function*. 
+The comparison between the target and moving images measures how different (or similar) the two images are. 
+It is performed within the objective function. 
+
 ## Import packages
 
 We need to import a few libraries (called packages in Python). We use:
@@ -835,16 +847,6 @@ def setFibres(aCentroidSet):
 ```
 
 ## Registration of a cube
-
-In image registration, a *moving object* is geometrically deformed so that its image matches a *target image*. 
-The parameters of the deformation is controlled and iteratively tuned by an optimisation algorithm. 
-![Registration flowchart](doc/registration.svg)
-In our context, the target is the sinogram provided by the experiment at ESRF. 
-The moving image is created by simulation using [gVirtualXRay](https://sourceforge.net/projects/gvirtualxray/). 
-The simulation parameters are repetitively tuned by a global optimisation algorithm until a stopping criterion is met. 
-The optimisation algorithm will minimise (or maximise) a numerical value, the *objective function*. 
-The comparison between the target and moving images measures how different (or similar) the two images are. 
-It is performed within the objective function. 
 
 We define a function to create the polygon mesh of the Ti90Al6V4 matrix.
 
