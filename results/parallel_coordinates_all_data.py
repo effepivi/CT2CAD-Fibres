@@ -84,11 +84,11 @@ def extract_columns(df):
 
     small_df["ZNCC"] = df["LAPLACIAN_LSF_ZNCC"];
     small_df["Runtime (in min)"] = df["OVERALL_RUNTIME (in min)"];
-    small_df["r W (in um)"] = df["LAPLACIAN1_RADIUS_CORE (in um)"].astype(int);
-    small_df["r SiC (in um)"] = df["LAPLACIAN1_RADIUS_FIBRE (in um)"].astype(int);
-    small_df["mu_W"] = df["MEAN_CORE_SIM"].astype(int);
-    small_df["mu_SiC"] = df["MEAN_FIBRE_SIM"].astype(int);
-    small_df["mu_Ti90Al6V4"] = df["MEAN_MATRIX_SIM"].astype(int);
+    small_df["r W (in um)"] = df["LAPLACIAN1_RADIUS_CORE (in um)"].round(0).astype(int);
+    small_df["r SiC (in um)"] = df["LAPLACIAN1_RADIUS_FIBRE (in um)"].round(0).astype(int);
+    small_df["mu_W"] = df["MEAN_CORE_SIM"].round(0).astype(int);
+    small_df["mu_SiC"] = df["MEAN_FIBRE_SIM"].round(0).astype(int);
+    small_df["mu_Ti90Al6V4"] = df["MEAN_MATRIX_SIM"].round(0).astype(int);
 
     return small_df;
 

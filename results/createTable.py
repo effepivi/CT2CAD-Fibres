@@ -9,6 +9,7 @@ import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+from matplotlib import cm
 
 import numpy as np
 from skimage.util import compare_images
@@ -321,7 +322,9 @@ def drawProfiles(objectives, colours, labels):
         sim = np.diag(sitk.GetArrayFromImage(simulated_CT)[505 - offset:505 + offset + 1,501 - offset:501 + offset + 1])
         plt.plot(np.array(range(len(sim))) * 1.9, sim, "-.", label="Best run for " + label, color="#ffa600");
 
-
+    #plt.yscale("log")
+    #plt.ylim((ref.min(), ref.max()))
+    
     plt.xlabel("Distance (in $\mathrm{\mu}$m)");
     plt.ylabel("Linear attenuation coefficients (in cm$^{-1}$)");
 
@@ -500,6 +503,8 @@ fig1, ax = plt.subplots(gridspec_kw = {'wspace':100, 'hspace': 100})
 
 ref_CT = sitk.ReadImage("../tutorial/fbp_scipy_recons.mha")
 
+norm = cm.colors.Normalize(vmax=30, vmin=-20)
+
 i = 0;
 for objective, label in zip(["FULL_REGISTRATION_SINOGRAM_PARTIAL_NORMALISED_RMSE"],
         ["RMSE on sinogram\nwith normalisation"]):
@@ -531,10 +536,10 @@ for objective, label in zip(["FULL_REGISTRATION_SINOGRAM_PARTIAL_NORMALISED_RMSE
     ax1 = fig1.add_subplot(1, 3, 1 + i * 3);
 
     ax1.set_title('Worse run, ZNCC: ' + "{:.2f}".format(df[selection]["LAPLACIAN_LSF_ZNCC"].min()) + "%");
-    plt.imshow(img, cmap='gray')
-    ax1.set_xticks([], [])
-    ax1.set_yticks([], [])
-
+    plt.imshow(img, cmap='gray', norm=norm)
+    ax1.set_xticks([])
+    ax1.set_yticks([])
+    ax1.axis('off')
 
     fname = objective + "/run_SCW_" + str(df["i"][idxmedian]) + "/simulated_CT_before_noise.mha";
     simulated_CT = sitk.ReadImage(fname)
@@ -543,11 +548,10 @@ for objective, label in zip(["FULL_REGISTRATION_SINOGRAM_PARTIAL_NORMALISED_RMSE
     ax1 = fig1.add_subplot(1, 3, 2 + i * 3);
 
     ax1.set_title('\nMedian run, ZNCC: ' + "{:.2f}".format(median_value) + "%");
-    plt.imshow(img, cmap='gray')
-    ax1.set_xticks([], [])
-    ax1.set_yticks([], [])
-
-
+    plt.imshow(img, cmap='gray', norm=norm)
+    ax1.set_xticks([])
+    ax1.set_yticks([])
+    ax1.axis('off')
 
     fname = objective + "/run_SCW_" + str(df["i"][idxmax]) + "/simulated_CT_before_noise.mha";
     simulated_CT = sitk.ReadImage(fname)
@@ -556,10 +560,11 @@ for objective, label in zip(["FULL_REGISTRATION_SINOGRAM_PARTIAL_NORMALISED_RMSE
     ax1 = fig1.add_subplot(1, 3, 3 + i * 3);
 
     ax1.set_title('\nBest run, ZNCC: ' + "{:.2f}".format(df[selection]["LAPLACIAN_LSF_ZNCC"].max()) + "%");
-    plt.imshow(img, cmap='gray')
-    ax1.set_xticks([], [])
-    ax1.set_yticks([], [])
-
+    plt.imshow(img, cmap='gray', norm=norm)
+    ax1.set_xticks([])
+    ax1.set_yticks([])
+    ax1.axis('off')
+    
     i += 1;
 
 
@@ -572,8 +577,8 @@ for objective, label in zip(["FULL_REGISTRATION_SINOGRAM_PARTIAL_NORMALISED_RMSE
 #                     wspace=0.,
 #                     hspace=0.25)
 
-ax.set_xticks([], [])
-ax.set_yticks([], [])
+ax.set_xticks([])
+ax.set_yticks([])
 ax.axis('off')
 
 
@@ -618,10 +623,10 @@ for objective, label in zip(["FULL_REGISTRATION_SINOGRAM_PARTIAL_NORMALISED_RMSE
     ax1 = fig1.add_subplot(1, 3, 1 + i * 3);
 
     ax1.set_title('Worse run, ZNCC: ' + "{:.2f}".format(df[selection]["LAPLACIAN_LSF_ZNCC"].min()) + "%");
-    plt.imshow(img, cmap='gray')
-    ax1.set_xticks([], [])
-    ax1.set_yticks([], [])
-
+    plt.imshow(img, cmap='gray', norm=norm)
+    ax1.set_xticks([])
+    ax1.set_yticks([])
+    ax1.axis('off')
 
     fname = objective + "/run_SCW_" + str(df["i"][idxmedian]) + "/simulated_CT_before_noise.mha";
     simulated_CT = sitk.ReadImage(fname)
@@ -632,10 +637,10 @@ for objective, label in zip(["FULL_REGISTRATION_SINOGRAM_PARTIAL_NORMALISED_RMSE
     ax1 = fig1.add_subplot(1, 3, 2 + i * 3);
 
     ax1.set_title('\nMedian run, ZNCC: ' + "{:.2f}".format(median_value) + "%");
-    plt.imshow(img, cmap='gray')
-    ax1.set_xticks([], [])
-    ax1.set_yticks([], [])
-
+    plt.imshow(img, cmap='gray', norm=norm)
+    ax1.set_xticks([])
+    ax1.set_yticks([])
+    ax1.axis('off')
 
 
     fname = objective + "/run_SCW_" + str(df["i"][idxmax]) + "/simulated_CT_before_noise.mha";
@@ -647,10 +652,11 @@ for objective, label in zip(["FULL_REGISTRATION_SINOGRAM_PARTIAL_NORMALISED_RMSE
     ax1 = fig1.add_subplot(1, 3, 3 + i * 3);
 
     ax1.set_title('\nBest run, ZNCC: ' + "{:.2f}".format(df[selection]["LAPLACIAN_LSF_ZNCC"].max()) + "%");
-    plt.imshow(img, cmap='gray')
-    ax1.set_xticks([], [])
-    ax1.set_yticks([], [])
-
+    plt.imshow(img, cmap='gray', norm=norm)
+    ax1.set_xticks([])
+    ax1.set_yticks([])
+    ax1.axis('off')
+    
     i += 1;
 
 
@@ -663,8 +669,8 @@ for objective, label in zip(["FULL_REGISTRATION_SINOGRAM_PARTIAL_NORMALISED_RMSE
 #                     wspace=0.,
 #                     hspace=0.25)
 
-ax.set_xticks([], [])
-ax.set_yticks([], [])
+ax.set_xticks([])
+ax.set_yticks([])
 ax.axis('off')
 
 
