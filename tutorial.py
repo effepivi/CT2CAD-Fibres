@@ -1100,7 +1100,7 @@ if os.path.isfile(output_directory + "/cube.dat"):
 # Perform the registration using CMA-ES
 else:
     ZNCC = 0.0;
-    
+
     while ZNCC < 0.4:
         best_fitness = sys.float_info.max;
         best_fitness_id = 0;
@@ -1115,14 +1115,14 @@ else:
         es = cma.CMAEvolutionStrategy([0.0, 0.0, 0.0, 0.256835938, 0.232903226], 0.5, opts);
         es.optimize(fitnessFunctionCube);
         elapsed_time = time.time() - start_time
-        
+
         setMatrix(es.result.xbest);
         simulated_sinogram, normalised_projections, raw_projections_in_keV = simulateSinogram(sigma_set, k_set, label_set);
         simulated_sinogram.shape = [number_of_projections, detector_width_in_pixels];
         simulated_CT = iradon(simulated_sinogram.T, theta=theta, circle=True, filter_name='shepp-logan');
         normalised_simulated_CT = (simulated_CT - simulated_CT.mean()) / simulated_CT.std();
         ZNCC = np.mean(np.multiply(normalised_reference_CT, normalised_simulated_CT));
-    
+
     print("Matrix execution time:", elapsed_time);
 
     matrix_geometry_parameters = copy.deepcopy(es.result.xbest);
@@ -2109,16 +2109,14 @@ def fitnessFunctionLaplacianLSF(x):
     # sigma_matrix = x[4];
     k_matrix = x[2];
 
-    a2 = x[3];
-    b2 = x[4];
-    c2 = x[5];
-    d2 = x[6];
-    e2 = x[7];
-    f2 = x[8];
+    b2 = x[3];
+    c2 = x[4];
+    e2 = x[5];
+    f2 = x[6];
 
     # The response of the detector as the line-spread function (LSF)
     t = np.arange(-20., 21., 1.);
-    lsf_kernel=lsf(t*41, a2, b2, c2, d2, e2, f2);
+    lsf_kernel=lsf(t*41, b2, c2, e2, f2);
     lsf_kernel/=lsf_kernel.sum();
 
     # Simulate a sinogram
@@ -2179,20 +2177,16 @@ if os.path.isfile(output_directory + "/laplacian2.dat") and os.path.isfile(outpu
     k_matrix = temp[2];
 
     temp = np.loadtxt(output_directory + "/lsf2.dat");
-    a2 = temp[0];
-    b2 = temp[1];
-    c2 = temp[2];
-    d2 = temp[3];
-    e2 = temp[4];
-    f2 = temp[5];
+    b2 = temp[0];
+    c2 = temp[1];
+    e2 = temp[2];
+    f2 = temp[3];
 
 # Perform the registration using CMA-ES
 else:
 
-    a2 = 601.873;
     b2 = 54.9359;
     c2 = -3.58452;
-    d2 = 0.469614;
     e2 = 6.32561e+09;
     f2 = 1.0;
 
@@ -2200,7 +2194,7 @@ else:
         k_core,
         k_fibre,
         k_matrix,
-        a2, b2, c2, d2, e2, f2
+        b2, c2, e2, f2
     ];
 
     bounds = [
@@ -2208,10 +2202,8 @@ else:
             k_core-500,
             k_fibre-500,
             k_matrix-500,
-            a2 - a2 / 4.,
             b2 - b2 / 4.,
             c2 + c2 / 4.,
-            d2 - d2 / 4.,
             e2 - e2 / 4.,
             f2 - f2/ 4.
         ],
@@ -2219,10 +2211,8 @@ else:
             k_core+500,
             k_fibre+500,
             k_matrix+500,
-            a2 + a2 / 4.,
             b2 + b2 / 4.,
             c2 - c2 / 4.,
-            d2 + d2 / 4.,
             e2 + e2 / 4.,
             f2 + f2/ 4.
         ]
@@ -2239,7 +2229,7 @@ else:
     #opts['seed'] = 987654321;
     # opts['maxiter'] = 5;
     opts['CMA_stds'] = [1250 * 0.2, 1250 * 0.2, 1250 * 0.2,
-        a2 * 0.2, b2 * 0.2, -c2 * 0.2, d2 * 0.2, e2 * 0.2, f2 * 0.2];
+        b2 * 0.2, -c2 * 0.2, e2 * 0.2, f2 * 0.2];
 
     start_time = time.time();
     es = cma.CMAEvolutionStrategy(x0, 0.25, opts);
@@ -2251,15 +2241,13 @@ else:
     k_fibre = es.result.xbest[1];
     k_matrix = es.result.xbest[2];
 
-    a2 = es.result.xbest[3];
-    b2 = es.result.xbest[4];
-    c2 = es.result.xbest[5];
-    d2 = es.result.xbest[6];
-    e2 = es.result.xbest[7];
-    f2 = es.result.xbest[8];
+    b2 = es.result.xbest[3];
+    c2 = es.result.xbest[4];
+    e2 = es.result.xbest[5];
+    f2 = es.result.xbest[6];
 
     np.savetxt(output_directory + "/laplacian2.dat", [k_core, k_fibre, k_matrix], header='k_core, k_fibre, k_matrix');
-    np.savetxt(output_directory + "/lsf2.dat", [a2, b2, c2, d2, e2, f2], header='a2, b2, c2, d2, e2, f2');
+    np.savetxt(output_directory + "/lsf2.dat", [b2, c2, e2, f2], header='b2, c2, e2, f2');
 
 
 # In[ ]:
@@ -2279,7 +2267,7 @@ else:
 
 # The response of the detector as the line-spread function (LSF)
 t = np.arange(-20., 21., 1.);
-lsf_kernel=lsf(t*41, a2, b2, c2, d2, e2, f2);
+lsf_kernel=lsf(t*41, b2, c2, e2, f2);
 lsf_kernel/=lsf_kernel.sum();
 np.savetxt(output_directory + "/LSF_optimised.txt", lsf_kernel);
 
