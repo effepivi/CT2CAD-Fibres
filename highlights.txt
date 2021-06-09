@@ -1,0 +1,5 @@
+Fully automatic creation of CAD models by image registration of X-ray projections.
+Automatic, accurate and stable geometric analysis of the material scanned by synchrotron microtomography.
+Realistic simulation of the imaging chain, including beam hardening, impulse response of the detector, phase contrast, and photon noise.
+Generation of simulated CT images, including their defects leading to realistic artefacts.
+Fast X-ray simulations on GPU into an objective function to optimise.
