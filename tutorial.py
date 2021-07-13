@@ -2177,10 +2177,19 @@ if os.path.isfile(output_directory + "/laplacian2.dat") and os.path.isfile(outpu
     k_matrix = temp[2];
 
     temp = np.loadtxt(output_directory + "/lsf2.dat");
-    b2 = temp[0];
-    c2 = temp[1];
-    e2 = temp[2];
-    f2 = temp[3];
+
+    if temp.shape[0] == 4:
+        b2 = temp[0];
+        c2 = temp[1];
+        e2 = temp[2];
+        f2 = temp[3];
+    elif temp.shape[0] == 6:
+        b2 = temp[1];
+        c2 = temp[2];
+        e2 = temp[3];
+        f2 = temp[4];
+    else:
+        raise "Cannot read " + output_directory + "/lsf2.dat"
 
 # Perform the registration using CMA-ES
 else:
