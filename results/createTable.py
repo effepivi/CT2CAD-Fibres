@@ -10,6 +10,8 @@ matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from matplotlib import cm
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+import matplotlib.patches as patches
 
 import numpy as np
 from skimage.util import compare_images
@@ -75,6 +77,7 @@ def printZNCC(column, best_objective, equivalent_objective, p_value_set):
     print("\end{tabular}")
 
 df = pd.read_csv("summary.csv", index_col=False);
+df_desktop = pd.read_csv("desktop/summary-desktop.csv", index_col=False);
 
 old_colums = [];
 for col in df.head():
@@ -90,10 +93,20 @@ test[test == True] = "sinogram"
 test[test == False] = "projections"
 df["DATA"] = test;
 
+test = df_desktop['objective'].str.contains("SINOGRAM");
+test[test == True] = "sinogram"
+test[test == False] = "projections"
+df_desktop["DATA"] = test;
+
+
+
 test = ~df['objective'].str.contains("NOT_NORMALISED");
-# test[test == True] = 0;
-# test[test == False] = 1;
 df["NORMALISATION"] = test;
+
+test = ~df_desktop['objective'].str.contains("NOT_NORMALISED");
+df_desktop["NORMALISATION"] = test;
+
+
 
 test = df['objective'].str.contains("_MAE");
 test[test == True] = "MAE";
@@ -109,7 +122,26 @@ test[test1 == True] = "ZNCC";
 
 df["METRICS"] = test;
 
+
+
+test = df_desktop['objective'].str.contains("_MAE");
+test[test == True] = "MAE";
+
+test1 = df_desktop['objective'].str.contains("_DSSIM");
+test[test1 == True] = "DSSIM";
+
+test1 = df_desktop['objective'].str.contains("_RMSE");
+test[test1 == True] = "RMSE";
+
+test1 = df_desktop['objective'].str.contains("_ZNCC");
+test[test1 == True] = "ZNCC";
+
+df_desktop["METRICS"] = test;
+
+
+
 df=df[new_colums];
+df_desktop=df_desktop[new_colums];
 
 METRICS=["MAE", "RMSE", "ZNCC", "DSSIM"];
 DATA=["PROJS", "SINOGRAM"];
@@ -117,6 +149,7 @@ NORMALISATION=["PARTIAL_NORMALISED", "PARTIAL_NOT_NORMALISED"]
 
 # df.drop("objective")
 df.to_csv("summary-bis.csv", index=False);
+df_desktop.to_csv("desktop/summary-desktop-bis.csv", index=False);
 
 def printDuration(column):
     print("\\begin{tabular}{c|c|c||c|c}")
@@ -305,7 +338,9 @@ def drawProfiles(objectives, colours, labels):
         print(objective, df["i"][idxmin], idxmedian, df["i"][idxmax])
         if not ref_not_plotted:
             ref_CT = sitk.ReadImage("../tutorial/fbp_scipy_recons.mha")
-            ref = np.diag(sitk.GetArrayFromImage(ref_CT)[0][505 - offset:505 + offset + 1,501 - offset:501 + offset + 1])
+            ground_truth = sitk.GetArrayFromImage(ref_CT)[0]
+
+            ref = np.diag(ground_truth[505 - offset:505 + offset + 1,501 - offset:501 + offset + 1])
             plt.plot(np.array(range(len(ref))) * 1.9, ref, "k-", label="Real CT");
             ref_not_plotted = True;
 
@@ -324,7 +359,7 @@ def drawProfiles(objectives, colours, labels):
 
     #plt.yscale("log")
     #plt.ylim((ref.min(), ref.max()))
-    
+
     plt.xlabel("Distance (in $\mathrm{\mu}$m)");
     plt.ylabel("Linear attenuation coefficients (in cm$^{-1}$)");
 
@@ -333,19 +368,30 @@ def drawProfiles(objectives, colours, labels):
     plt.tight_layout();
     plt.savefig("profiles.pdf");
 
-    plt.show()
+    # plt.show()
 
 def drawScatterPlots(objectives, colours, labels):
-    fig1, ax1 = plt.subplots()
+
+
+
+    plt.figure(figsize=(20,10))
     plt.xlabel("ZNCC (in %)");
     plt.ylabel("Runtime (in min)");
 
-    for objective, colour, label in zip(objectives, colours, labels):
+    for i in range(3):
+        objective = objectives[i]
+        colour = colours[i]
+        label = labels[i]
+
         selection = df["objective"] == objective;
+        selection_desktop = df_desktop["objective"] == objective;
 
-        plt.scatter(df[selection]["LAPLACIAN_LSF_ZNCC"], df[selection]["OVERALL_RUNTIME (in min)"], color=colour, label=label)
+        plt.scatter(df[selection]["LAPLACIAN_LSF_ZNCC"], df[selection]["OVERALL_RUNTIME (in min)"], marker="o", color=colour, label=label + " (SCW)")
+        plt.scatter(df_desktop[selection_desktop]["LAPLACIAN_LSF_ZNCC"], df_desktop[selection_desktop]["OVERALL_RUNTIME (in min)"], marker="^", color=colour, label=label + " (PC)")
 
-    plt.legend(loc='lower center', bbox_to_anchor=(.5, -0.5));
+
+
+    plt.legend(loc='upper left');
 
 
     plt.tight_layout();
@@ -355,10 +401,6 @@ def drawScatterPlots(objectives, colours, labels):
 drawProfiles(["FULL_REGISTRATION_SINOGRAM_PARTIAL_NORMALISED_RMSE"],
         ["g"],
         ["RMSE on sinogram\nwith normalisation"])
-
-drawScatterPlots(["FULL_REGISTRATION_SINOGRAM_PARTIAL_NORMALISED_RMSE", "FULL_REGISTRATION_SINOGRAM_PARTIAL_NORMALISED_DSSIM"],
-        ["green", "red"],
-        ["RMSE on sinogram with normalisation", "DSSIM on projections with normalisation"])
 
 
 
@@ -487,9 +529,9 @@ printDuration("OVERALL_RUNTIME (in min)");
 
 
 
-SMALL_SIZE = 5
-MEDIUM_SIZE = 6
-BIGGER_SIZE = 7
+SMALL_SIZE = 13
+MEDIUM_SIZE = 14
+BIGGER_SIZE = 15
 
 plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
 plt.rc('axes', titlesize=SMALL_SIZE)     # fontsize of the axes title
@@ -499,74 +541,167 @@ plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
 plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
-fig1, ax = plt.subplots(gridspec_kw = {'wspace':100, 'hspace': 100})
+# fig1, ax = plt.subplots(gridspec_kw = {'wspace':100, 'hspace': 100})
+
+drawScatterPlots(["FULL_REGISTRATION_SINOGRAM_PARTIAL_NORMALISED_RMSE", "FULL_REGISTRATION_PROJS_PARTIAL_NORMALISED_DSSIM", "FULL_REGISTRATION_SINOGRAM_PARTIAL_NORMALISED_ZNCC"],
+        ["#1b9e77", "#d95f02", "#7570b3"],
+        ["RMSE on sinogram with normalisation", "DSSIM on projections with normalisation", "ZNCC on sinogram"])
+
+
 
 ref_CT = sitk.ReadImage("../tutorial/fbp_scipy_recons.mha")
+ground_truth = sitk.GetArrayFromImage(ref_CT)[0]
 
 norm = cm.colors.Normalize(vmax=30, vmin=-20)
 
-i = 0;
-for objective, label in zip(["FULL_REGISTRATION_SINOGRAM_PARTIAL_NORMALISED_RMSE"],
-        ["RMSE on sinogram\nwith normalisation"]):
-    selection = df["objective"] == objective;
+objective = "FULL_REGISTRATION_SINOGRAM_PARTIAL_NORMALISED_RMSE"
+label = "RMSE on sinogram\nwith normalisation"
 
-    idxmin = df[selection]["LAPLACIAN_LSF_ZNCC"].idxmin();
-    idxmax = df[selection]["LAPLACIAN_LSF_ZNCC"].idxmax();
+selection = df["objective"] == objective;
 
-    # if df[selection]['LAPLACIAN_LSF_ZNCC'].count() != 15:
-    #     print("MISSING DATA FOR", objective)
-    #     exit();
-    median_value = df[selection]['LAPLACIAN_LSF_ZNCC'].median();
-    for row_id, row_ZNCC in zip(df[selection]['i'], df[selection]['LAPLACIAN_LSF_ZNCC']):
+idxmin = df[selection]["LAPLACIAN_LSF_ZNCC"].idxmin();
+idxmax = df[selection]["LAPLACIAN_LSF_ZNCC"].idxmax();
 
-        print(row_ZNCC, median_value)
-        if row_ZNCC == median_value:
-            idxmedian = row_id;
+# if df[selection]['LAPLACIAN_LSF_ZNCC'].count() != 15:
+#     print("MISSING DATA FOR", objective)
+#     exit();
+median_value = df[selection]['LAPLACIAN_LSF_ZNCC'].median();
+for row_id, row_ZNCC in zip(df[selection]['i'], df[selection]['LAPLACIAN_LSF_ZNCC']):
 
-    print(objective)
-    print("\t", df["i"][idxmin], df[selection]["LAPLACIAN_LSF_ZNCC"].min())
-    print("\t", df["i"][idxmedian], df[selection]["LAPLACIAN_LSF_ZNCC"].median())
-    print("\t", df["i"][idxmax], df[selection]["LAPLACIAN_LSF_ZNCC"].max())
+    print(row_ZNCC, median_value)
+    if row_ZNCC == median_value:
+        idxmedian = row_id;
 
-    fname = objective + "/run_SCW_" + str(df["i"][idxmin]) + "/simulated_CT_before_noise.mha";
-    simulated_CT = sitk.ReadImage(fname)
+print(objective)
+print("\t", df["i"][idxmin], df[selection]["LAPLACIAN_LSF_ZNCC"].min())
+print("\t", df["i"][idxmedian], df[selection]["LAPLACIAN_LSF_ZNCC"].median())
+print("\t", df["i"][idxmax], df[selection]["LAPLACIAN_LSF_ZNCC"].max())
 
-    img = compare_images(sitk.GetArrayFromImage(ref_CT)[0], sitk.GetArrayFromImage(simulated_CT), method='checkerboard');
-    print(fname)
-    ax1 = fig1.add_subplot(1, 3, 1 + i * 3);
+fig, axes = plt.subplots(nrows=1, ncols=3)
 
-    ax1.set_title('Worse run, ZNCC: ' + "{:.2f}".format(df[selection]["LAPLACIAN_LSF_ZNCC"].min()) + "%");
-    plt.imshow(img, cmap='gray', norm=norm)
-    ax1.set_xticks([])
-    ax1.set_yticks([])
-    ax1.axis('off')
+norm = cm.colors.Normalize(vmax=30, vmin=-20)
 
-    fname = objective + "/run_SCW_" + str(df["i"][idxmedian]) + "/simulated_CT_before_noise.mha";
-    simulated_CT = sitk.ReadImage(fname)
-    img = compare_images(sitk.GetArrayFromImage(ref_CT)[0], sitk.GetArrayFromImage(simulated_CT), method='checkerboard');
-    print(fname)
-    ax1 = fig1.add_subplot(1, 3, 2 + i * 3);
+fname = objective + "/run_SCW_" + str(df["i"][idxmin]) + "/simulated_CT_before_noise.mha";
+simulated_CT = sitk.GetArrayFromImage(sitk.ReadImage(fname))
+checkerboard = compare_images(ground_truth, simulated_CT, method='checkerboard');
+# diff = compare_images(ground_truth, simulated_CT, method='diff');
+# relative_error = 100 * (ground_truth - simulated_CT) / ground_truth
 
-    ax1.set_title('\nMedian run, ZNCC: ' + "{:.2f}".format(median_value) + "%");
-    plt.imshow(img, cmap='gray', norm=norm)
-    ax1.set_xticks([])
-    ax1.set_yticks([])
-    ax1.axis('off')
+axes.flat[0].set_title('Worse run, ZNCC: ' + "{:.2f}".format(df[selection]["LAPLACIAN_LSF_ZNCC"].min()) + "%");
+img0 = axes.flat[0].imshow(checkerboard, cmap='gray', norm=norm)
+axes.flat[0].set_xticks([])
+axes.flat[0].set_yticks([])
+axes.flat[0].axis('off')
 
-    fname = objective + "/run_SCW_" + str(df["i"][idxmax]) + "/simulated_CT_before_noise.mha";
-    simulated_CT = sitk.ReadImage(fname)
-    img = compare_images(sitk.GetArrayFromImage(ref_CT)[0], sitk.GetArrayFromImage(simulated_CT), method='checkerboard');
-    print(fname)
-    ax1 = fig1.add_subplot(1, 3, 3 + i * 3);
+divider = make_axes_locatable(axes.flat[0])
+ax_cb = divider.new_horizontal(size="5%", pad=0.05)
+ax_cb.set_xticks([])
+ax_cb.set_yticks([])
+ax_cb.axis('off')
+fig.add_axes(ax_cb)
 
-    ax1.set_title('\nBest run, ZNCC: ' + "{:.2f}".format(df[selection]["LAPLACIAN_LSF_ZNCC"].max()) + "%");
-    plt.imshow(img, cmap='gray', norm=norm)
-    ax1.set_xticks([])
-    ax1.set_yticks([])
-    ax1.axis('off')
-    
-    i += 1;
+# img3 = axes.flat[3].imshow(relative_error, cmap="RdBu", vmin=-100, vmax=100)
+# axes.flat[3].set_xticks([])
+# axes.flat[3].set_yticks([])
+# axes.flat[3].axis('off')
+#
+# divider = make_axes_locatable(axes.flat[3])
+# ax_cb = divider.new_horizontal(size="5%", pad=0.05)
+# ax_cb.set_xticks([])
+# ax_cb.set_yticks([])
+# ax_cb.axis('off')
+# fig.add_axes(ax_cb)
 
+fname = objective + "/run_SCW_" + str(df["i"][idxmedian]) + "/simulated_CT_before_noise.mha";
+simulated_CT = sitk.GetArrayFromImage(sitk.ReadImage(fname))
+checkerboard = compare_images(ground_truth, simulated_CT, method='checkerboard');
+# diff = compare_images(ground_truth, simulated_CT, method='diff');
+# relative_error = 100 * (ground_truth - simulated_CT) / ground_truth
+
+axes.flat[1].set_title('\nMedian run, ZNCC: ' + "{:.2f}".format(median_value) + "%");
+img1 = axes.flat[1].imshow(checkerboard, cmap='gray', norm=norm)
+axes.flat[1].set_xticks([])
+axes.flat[1].set_yticks([])
+axes.flat[1].axis('off')
+
+divider = make_axes_locatable(axes.flat[1])
+ax_cb = divider.new_horizontal(size="5%", pad=0.05)
+ax_cb.set_xticks([])
+ax_cb.set_yticks([])
+ax_cb.axis('off')
+fig.add_axes(ax_cb)
+
+# img4 = axes.flat[4].imshow(relative_error, cmap="RdBu", vmin=-100, vmax=100)
+# axes.flat[4].set_xticks([])
+# axes.flat[4].set_yticks([])
+# axes.flat[4].axis('off')
+#
+# divider = make_axes_locatable(axes.flat[4])
+# ax_cb = divider.new_horizontal(size="5%", pad=0.05)
+# ax_cb.set_xticks([])
+# ax_cb.set_yticks([])
+# ax_cb.axis('off')
+# fig.add_axes(ax_cb)
+
+fname = objective + "/run_SCW_" + str(df["i"][idxmax]) + "/simulated_CT_before_noise.mha";
+simulated_CT = sitk.GetArrayFromImage(sitk.ReadImage(fname))
+checkerboard = compare_images(ground_truth, simulated_CT, method='checkerboard');
+# diff = compare_images(ground_truth, simulated_CT, method='diff');
+# relative_error = 100 * (ground_truth - simulated_CT) / ground_truth
+
+axes.flat[2].set_title('\nBest run, ZNCC: ' + "{:.2f}".format(df[selection]["LAPLACIAN_LSF_ZNCC"].max()) + "%");
+img2 = axes.flat[2].imshow(checkerboard, cmap='gray', norm=norm)
+axes.flat[2].set_xticks([])
+axes.flat[2].set_yticks([])
+axes.flat[2].axis('off')
+
+divider = make_axes_locatable(axes.flat[2])
+ax_cb = divider.new_horizontal(size="5%", pad=0.05)
+fig.add_axes(ax_cb)
+plt.colorbar(img2, cax=ax_cb)
+ax_cb.yaxis.tick_right()
+ax_cb.yaxis.set_tick_params(labelright=True)
+
+# img5 = axes.flat[5].imshow(relative_error, cmap="RdBu", vmin=-100, vmax=100)
+# axes.flat[5].set_xticks([])
+# axes.flat[5].set_yticks([])
+# axes.flat[5].axis('off')
+#
+# divider = make_axes_locatable(axes.flat[5])
+# ax_cb = divider.new_horizontal(size="5%", pad=0.05)
+# fig.add_axes(ax_cb)
+# plt.colorbar(img5, cax=ax_cb)
+# ax_cb.yaxis.tick_right()
+# ax_cb.yaxis.set_tick_params(labelright=True)
+
+
+# Create a Rectangle patch
+offset_x = int(checkerboard.shape[1] / 8)
+offset_y = int(checkerboard.shape[0] / 8)
+
+for i in range(3):
+    rect1 = patches.Rectangle((0, 0), offset_x - 1, offset_y - 1, linewidth=0.1, edgecolor='r', facecolor='none')
+    rect2 = patches.Rectangle((offset_x+1, offset_y+1), offset_x - 1, offset_y - 1, linewidth=0.1, edgecolor='r', facecolor='none')
+    rect3 = patches.Rectangle((0, offset_y + 1), offset_x - 1, offset_y-1, linewidth=0.1, edgecolor='b', facecolor='none')
+    rect4 = patches.Rectangle((offset_x+1, 0), offset_x - 1, offset_y, linewidth=0.1, edgecolor='b', facecolor='none')
+
+    # Add the patches to the Axes
+    axes.flat[i].add_patch(rect1)
+    axes.flat[i].add_patch(rect2)
+    axes.flat[i].add_patch(rect3)
+    axes.flat[i].add_patch(rect4)
+
+
+
+
+# fig.subplots_adjust(bottom=0.1, top=0.9, left=0.1, right=0.8,
+#                     wspace=0.1, hspace=0.02)
+#
+# cb_ax = fig.add_axes([0.83, 0.5, 0.02, 0.15])
+# cbar = fig.colorbar(img0, cax=cb_ax)
+#
+# cb_ax = fig.add_axes([0.83, 0.0, 0.02, 0.15])
+# cbar = fig.colorbar(img3, cax=axes.flat[5])
 
 # plt.subplots_adjust(wspace=0.5, hspace=0.3)
 # set the spacing between subplots
@@ -577,88 +712,144 @@ for objective, label in zip(["FULL_REGISTRATION_SINOGRAM_PARTIAL_NORMALISED_RMSE
 #                     wspace=0.,
 #                     hspace=0.25)
 
-ax.set_xticks([])
-ax.set_yticks([])
-ax.axis('off')
+# axes.set_xticks([])
+# axes.set_yticks([])
+# axes.axis('off')
 
 
 # plt.tight_layout();
 plt.savefig("checkerboard.pdf", dpi=600);
 
 
-fig1, ax = plt.subplots(gridspec_kw = {'wspace':100, 'hspace': 100})
 
-ref_CT = sitk.ReadImage("../tutorial/fbp_scipy_recons.mha")
 offset = 30;
+fig, axes = plt.subplots(nrows=1, ncols=3)
 
-i = 0;
-for objective, label in zip(["FULL_REGISTRATION_SINOGRAM_PARTIAL_NORMALISED_RMSE"],
-        ["RMSE on sinogram\nwith normalisation"]):
-    selection = df["objective"] == objective;
+norm = cm.colors.Normalize(vmax=30, vmin=-20)
 
-    idxmin = df[selection]["LAPLACIAN_LSF_ZNCC"].idxmin();
-    idxmax = df[selection]["LAPLACIAN_LSF_ZNCC"].idxmax();
+fname = objective + "/run_SCW_" + str(df["i"][idxmin]) + "/simulated_CT_before_noise.mha";
+simulated_CT = sitk.GetArrayFromImage(sitk.ReadImage(fname))[505 - offset:505 + offset + 1,501 - offset:501 + offset + 1]
+checkerboard = compare_images(ground_truth[505 - offset:505 + offset + 1,501 - offset:501 + offset + 1], simulated_CT, method='checkerboard', n_tiles=(5, 5));
+# diff = compare_images(ground_truth, simulated_CT, method='diff');
+# relative_error = 100 * (ground_truth - simulated_CT) / ground_truth
 
-    # if df[selection]['LAPLACIAN_LSF_ZNCC'].count() != 15:
-    #     print("MISSING DATA FOR", objective)
-    #     exit();
-    median_value = df[selection]['LAPLACIAN_LSF_ZNCC'].median();
-    for row_id, row_ZNCC in zip(df[selection]['i'], df[selection]['LAPLACIAN_LSF_ZNCC']):
+axes.flat[0].set_title('Worse run, ZNCC: ' + "{:.2f}".format(df[selection]["LAPLACIAN_LSF_ZNCC"].min()) + "%");
+img0 = axes.flat[0].imshow(checkerboard, cmap='gray', norm=norm)
+axes.flat[0].set_xticks([])
+axes.flat[0].set_yticks([])
+axes.flat[0].axis('off')
 
-        print(row_ZNCC, median_value)
-        if row_ZNCC == median_value:
-            idxmedian = row_id;
+divider = make_axes_locatable(axes.flat[0])
+ax_cb = divider.new_horizontal(size="5%", pad=0.05)
+ax_cb.set_xticks([])
+ax_cb.set_yticks([])
+ax_cb.axis('off')
+fig.add_axes(ax_cb)
 
-    print(objective)
-    print("\t", df["i"][idxmin], df[selection]["LAPLACIAN_LSF_ZNCC"].min())
-    print("\t", df["i"][idxmax], df[selection]["LAPLACIAN_LSF_ZNCC"].max())
+# img3 = axes.flat[3].imshow(relative_error, cmap="RdBu", vmin=-100, vmax=100)
+# axes.flat[3].set_xticks([])
+# axes.flat[3].set_yticks([])
+# axes.flat[3].axis('off')
+#
+# divider = make_axes_locatable(axes.flat[3])
+# ax_cb = divider.new_horizontal(size="5%", pad=0.05)
+# ax_cb.set_xticks([])
+# ax_cb.set_yticks([])
+# ax_cb.axis('off')
+# fig.add_axes(ax_cb)
 
-    fname = objective + "/run_SCW_" + str(df["i"][idxmin]) + "/simulated_CT_before_noise.mha";
-    simulated_CT = sitk.ReadImage(fname)
+fname = objective + "/run_SCW_" + str(df["i"][idxmedian]) + "/simulated_CT_before_noise.mha";
+simulated_CT = sitk.GetArrayFromImage(sitk.ReadImage(fname))[505 - offset:505 + offset + 1,501 - offset:501 + offset + 1]
+checkerboard = compare_images(ground_truth[505 - offset:505 + offset + 1,501 - offset:501 + offset + 1], simulated_CT, method='checkerboard', n_tiles=(5, 5));
+# diff = compare_images(ground_truth, simulated_CT, method='diff');
+# relative_error = 100 * (ground_truth - simulated_CT) / ground_truth
 
-    img = compare_images(sitk.GetArrayFromImage(ref_CT)[0][505 - offset:505 + offset + 1,501 - offset:501 + offset + 1],
-        sitk.GetArrayFromImage(simulated_CT)[505 - offset:505 + offset + 1,501 - offset:501 + offset + 1],
-        method='checkerboard');
-    print(fname)
-    ax1 = fig1.add_subplot(1, 3, 1 + i * 3);
+axes.flat[1].set_title('\nMedian run, ZNCC: ' + "{:.2f}".format(median_value) + "%");
+img1 = axes.flat[1].imshow(checkerboard, cmap='gray', norm=norm)
+axes.flat[1].set_xticks([])
+axes.flat[1].set_yticks([])
+axes.flat[1].axis('off')
 
-    ax1.set_title('Worse run, ZNCC: ' + "{:.2f}".format(df[selection]["LAPLACIAN_LSF_ZNCC"].min()) + "%");
-    plt.imshow(img, cmap='gray', norm=norm)
-    ax1.set_xticks([])
-    ax1.set_yticks([])
-    ax1.axis('off')
+divider = make_axes_locatable(axes.flat[1])
+ax_cb = divider.new_horizontal(size="5%", pad=0.05)
+ax_cb.set_xticks([])
+ax_cb.set_yticks([])
+ax_cb.axis('off')
+fig.add_axes(ax_cb)
 
-    fname = objective + "/run_SCW_" + str(df["i"][idxmedian]) + "/simulated_CT_before_noise.mha";
-    simulated_CT = sitk.ReadImage(fname)
-    img = compare_images(sitk.GetArrayFromImage(ref_CT)[0][505 - offset:505 + offset + 1,501 - offset:501 + offset + 1],
-        sitk.GetArrayFromImage(simulated_CT)[505 - offset:505 + offset + 1,501 - offset:501 + offset + 1],
-        method='checkerboard');
-    print(fname)
-    ax1 = fig1.add_subplot(1, 3, 2 + i * 3);
+# img4 = axes.flat[4].imshow(relative_error, cmap="RdBu", vmin=-100, vmax=100)
+# axes.flat[4].set_xticks([])
+# axes.flat[4].set_yticks([])
+# axes.flat[4].axis('off')
+#
+# divider = make_axes_locatable(axes.flat[4])
+# ax_cb = divider.new_horizontal(size="5%", pad=0.05)
+# ax_cb.set_xticks([])
+# ax_cb.set_yticks([])
+# ax_cb.axis('off')
+# fig.add_axes(ax_cb)
 
-    ax1.set_title('\nMedian run, ZNCC: ' + "{:.2f}".format(median_value) + "%");
-    plt.imshow(img, cmap='gray', norm=norm)
-    ax1.set_xticks([])
-    ax1.set_yticks([])
-    ax1.axis('off')
+fname = objective + "/run_SCW_" + str(df["i"][idxmax]) + "/simulated_CT_before_noise.mha";
+simulated_CT = sitk.GetArrayFromImage(sitk.ReadImage(fname))[505 - offset:505 + offset + 1,501 - offset:501 + offset + 1]
+checkerboard = compare_images(ground_truth[505 - offset:505 + offset + 1,501 - offset:501 + offset + 1], simulated_CT, method='checkerboard', n_tiles=(5, 5));
+# diff = compare_images(ground_truth, simulated_CT, method='diff');
+# relative_error = 100 * (ground_truth - simulated_CT) / ground_truth
+
+axes.flat[2].set_title('\nBest run, ZNCC: ' + "{:.2f}".format(df[selection]["LAPLACIAN_LSF_ZNCC"].max()) + "%");
+img2 = axes.flat[2].imshow(checkerboard, cmap='gray', norm=norm)
+axes.flat[2].set_xticks([])
+axes.flat[2].set_yticks([])
+axes.flat[2].axis('off')
+
+divider = make_axes_locatable(axes.flat[2])
+ax_cb = divider.new_horizontal(size="5%", pad=0.05)
+fig.add_axes(ax_cb)
+plt.colorbar(img2, cax=ax_cb)
+ax_cb.yaxis.tick_right()
+ax_cb.yaxis.set_tick_params(labelright=True)
+
+# img5 = axes.flat[5].imshow(relative_error, cmap="RdBu", vmin=-100, vmax=100)
+# axes.flat[5].set_xticks([])
+# axes.flat[5].set_yticks([])
+# axes.flat[5].axis('off')
+#
+# divider = make_axes_locatable(axes.flat[5])
+# ax_cb = divider.new_horizontal(size="5%", pad=0.05)
+# fig.add_axes(ax_cb)
+# plt.colorbar(img5, cax=ax_cb)
+# ax_cb.yaxis.tick_right()
+# ax_cb.yaxis.set_tick_params(labelright=True)
 
 
-    fname = objective + "/run_SCW_" + str(df["i"][idxmax]) + "/simulated_CT_before_noise.mha";
-    simulated_CT = sitk.ReadImage(fname)
-    img = compare_images(sitk.GetArrayFromImage(ref_CT)[0][505 - offset:505 + offset + 1,501 - offset:501 + offset + 1],
-        sitk.GetArrayFromImage(simulated_CT)[505 - offset:505 + offset + 1,501 - offset:501 + offset + 1],
-        method='checkerboard');
-    print(fname)
-    ax1 = fig1.add_subplot(1, 3, 3 + i * 3);
+# Create a Rectangle patch
+offset_x = 7
+offset_y = 7
+offset_x = int(checkerboard.shape[1] / 5)
+offset_y = int(checkerboard.shape[0] / 5)
 
-    ax1.set_title('\nBest run, ZNCC: ' + "{:.2f}".format(df[selection]["LAPLACIAN_LSF_ZNCC"].max()) + "%");
-    plt.imshow(img, cmap='gray', norm=norm)
-    ax1.set_xticks([])
-    ax1.set_yticks([])
-    ax1.axis('off')
-    
-    i += 1;
+for i in range(3):
+    rect1 = patches.Rectangle((-0.4, -0.4), offset_x -0.4, offset_y -0.4, linewidth=0.15, edgecolor='r', facecolor='none')
+    rect2 = patches.Rectangle((offset_x -0.4, offset_y -0.4), offset_x - 0.4, offset_y - 0.4, linewidth=0.15, edgecolor='r', facecolor='none')
+    rect3 = patches.Rectangle((-0.4, offset_y -0.4), offset_x - 0.4, offset_y - 0.4, linewidth=0.15, edgecolor='b', facecolor='none')
+    rect4 = patches.Rectangle((offset_x -0.4, -0.4), offset_x - 0.4, offset_y - 0.4, linewidth=0.15, edgecolor='b', facecolor='none')
 
+    # Add the patches to the Axes
+    axes.flat[i].add_patch(rect1)
+    axes.flat[i].add_patch(rect2)
+    axes.flat[i].add_patch(rect3)
+    axes.flat[i].add_patch(rect4)
+
+
+
+
+# fig.subplots_adjust(bottom=0.1, top=0.9, left=0.1, right=0.8,
+#                     wspace=0.1, hspace=0.02)
+#
+# cb_ax = fig.add_axes([0.83, 0.5, 0.02, 0.15])
+# cbar = fig.colorbar(img0, cax=cb_ax)
+#
+# cb_ax = fig.add_axes([0.83, 0.0, 0.02, 0.15])
+# cbar = fig.colorbar(img3, cax=axes.flat[5])
 
 # plt.subplots_adjust(wspace=0.5, hspace=0.3)
 # set the spacing between subplots
@@ -669,13 +860,10 @@ for objective, label in zip(["FULL_REGISTRATION_SINOGRAM_PARTIAL_NORMALISED_RMSE
 #                     wspace=0.,
 #                     hspace=0.25)
 
-ax.set_xticks([])
-ax.set_yticks([])
-ax.axis('off')
+# axes.set_xticks([])
+# axes.set_yticks([])
+# axes.axis('off')
 
-
-
-# plt.tight_layout();
 plt.savefig("checkerboard-fibre.pdf", dpi=600);
 
 
