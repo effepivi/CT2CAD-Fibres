@@ -104,10 +104,9 @@ small_df_all_data.to_csv("summary_all_data-small.csv");
 fig_all_data = pcp(small_df_all_data);
 
 fig_all_data.update_layout(
-    font_size=16
+    font_size=17
 )
 
 
 fig_all_data.write_html("parallel_coordinates-ZNCC.html")
 fig_all_data.show();
-
