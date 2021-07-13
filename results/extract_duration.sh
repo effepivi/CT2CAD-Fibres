@@ -161,7 +161,13 @@ do
         # LAPLACIAN_LSF_IND=`echo $LAPLACIAN_LSF_FEVAL / $LAPLACIAN_LSF_ITER | bc`
 
 
-         STATS=`python3 ../imageStats.py ../../tutorial/fbp_scipy_recons.mha  $CT_slice_file`
+        if [ -f ../imageStats.py ];
+        then
+            STATS=`python3 ../imageStats.py ../../tutorial/fbp_scipy_recons.mha  $CT_slice_file`
+        else
+            STATS=`python3 ../../imageStats.py ../../../tutorial/fbp_scipy_recons.mha  $CT_slice_file`
+        fi
+        
         MEAN_CORE_REF=`echo $STATS | cut -d " " -f 1`
         STDDEV_CORE_REF=`echo $STATS | cut -d " " -f 2`
 
