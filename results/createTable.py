@@ -10,6 +10,7 @@ matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from matplotlib import cm
+from matplotlib.lines import Line2D
 
 import numpy as np
 from skimage.util import compare_images
@@ -160,6 +161,7 @@ def boxplot(column, column_order, ylabel, multiplier=1.0, limits=None):
 
     max_value = -math.inf;
     min_value = math.inf;
+    colors = []
 
     for metrics in METRICS:
         row = [];
@@ -180,14 +182,16 @@ def boxplot(column, column_order, ylabel, multiplier=1.0, limits=None):
                     if normalisation == "NORMALISED":
                         text_normalisation = "with full normalisation";
                     elif normalisation == "PARTIAL_NORMALISED":
-                        text_normalisation = "with normalisation";
+                        text_normalisation = "with";
+                        colors.append('pink')
                     else:
-                        text_normalisation = "without normalisation";
+                        text_normalisation = "without";
+                        colors.append('lightblue')
 
                     min_value = min(min_value, multiplier * df[selection][column].min());
                     max_value = max(max_value, multiplier * df[selection][column].max());
                     y_data.append(multiplier * df[selection][column]);
-                    labels.append(text_data + " " + text_normalisation);
+                    labels.append(text_normalisation);
                     ticks.append(i);
                     #median.append(df[selection][column_order].median());
                     i += 1;
@@ -198,25 +202,66 @@ def boxplot(column, column_order, ylabel, multiplier=1.0, limits=None):
     labels = np.array(labels);
 
     #ax1.boxplot((y_data.T)[order])
-    ax1.boxplot((y_data.T), notch=True,showfliers=True)
+    bplot = ax1.boxplot((y_data.T),
+        notch=True,
+        # showfliers=True,
+        # vert=True,  # vertical box alignment
+        patch_artist=True)  # fill with color)
+
+    # fill with colors
+    for patch, color in zip(bplot['boxes'], colors):
+        print(color)
+        patch.set_facecolor(color)
+        patch.set_edgecolor(color)
+
     #plt.xticks(ticks=ticks, labels=labels[order], rotation=45, ha='right');
     plt.xticks(ticks=ticks, labels=labels, rotation=45, ha='right');
     plt.subplots_adjust(bottom=0.25)
     plt.ylabel(ylabel);
     # plt.title(column);
 
+
     if not isinstance(limits, NoneType):
         plt.ylim(limits)
 
     xcoords = [4.5, 8.5, 10.5]
     for xc in xcoords:
-        plt.axvline(x=xc)
+        plt.axvline(x=xc,
+            # ymin=ax1.get_ylim()[0] + (ax1.get_ylim()[1] - ax1.get_ylim()[0]) * 0.01,
+            # ymax=ax1.get_ylim()[1] + (ax1.get_ylim()[1] - ax1.get_ylim()[0]) * 0.01,
+            linewidth=1,
+            color='gray',
+            linestyle="--")
 
+    xcoords = [2.5, 6.5, 9.5, 12.5]
+    for xc in xcoords:
+        plt.axvline(x=xc, linewidth=.5, color='gray', linestyle=":")
 
-    plt.text(2, max_value + (max_value - min_value) * 0.07, "MAE")
-    plt.text(6, max_value + (max_value - min_value) * 0.07, "RMSE")
-    plt.text(9, max_value + (max_value - min_value) * 0.07, "ZNCC")
-    plt.text(12, max_value + (max_value - min_value) * 0.07, "DSSIM")
+    ax1.get_ylim()[1]
+
+    plt.text(2.5, ax1.get_ylim()[1] + (ax1.get_ylim()[1] - ax1.get_ylim()[0]) * 0.015, "MAE", ha='center')
+    plt.text(6.5, ax1.get_ylim()[1] + (ax1.get_ylim()[1] - ax1.get_ylim()[0]) * 0.015, "RMSE", ha='center')
+    plt.text(9.5, ax1.get_ylim()[1] + (ax1.get_ylim()[1] - ax1.get_ylim()[0]) * 0.015, "ZNCC", ha='center')
+    plt.text(12.5, ax1.get_ylim()[1] + (ax1.get_ylim()[1] - ax1.get_ylim()[0]) * 0.015, "DSSIM", ha='center')
+
+    plt.text(1.5, ax1.get_ylim()[0] + (ax1.get_ylim()[1] - ax1.get_ylim()[0]) * 0.015, "Proj", ha='center')
+    plt.text(3.5, ax1.get_ylim()[0] + (ax1.get_ylim()[1] - ax1.get_ylim()[0]) * 0.015, "Sino", ha='center')
+    plt.text(5.5, ax1.get_ylim()[0] + (ax1.get_ylim()[1] - ax1.get_ylim()[0]) * 0.015, "Proj", ha='center')
+    plt.text(7.5, ax1.get_ylim()[0] + (ax1.get_ylim()[1] - ax1.get_ylim()[0]) * 0.015, "Sino", ha='center')
+    plt.text(9, ax1.get_ylim()[0] + (ax1.get_ylim()[1] - ax1.get_ylim()[0]) * 0.015, "Proj", ha='center')
+    plt.text(10, ax1.get_ylim()[0] + (ax1.get_ylim()[1] - ax1.get_ylim()[0]) * 0.015, "Sino", ha='center')
+    plt.text(11.5, ax1.get_ylim()[0] + (ax1.get_ylim()[1] - ax1.get_ylim()[0]) * 0.015, "Proj", ha='center')
+    plt.text(13.5, ax1.get_ylim()[0] + (ax1.get_ylim()[1] - ax1.get_ylim()[0]) * 0.015, "Sino", ha='center')
+
+    custom_lines = [Line2D([0], [0], color="pink", lw=4),
+                    Line2D([0], [0], color="lightblue", lw=4)]
+
+    plt.legend(custom_lines,
+        ['With zero-mean, unit variance normalisation', 'Without'],
+        loc='lower center',
+        bbox_to_anchor=(.5, -0.15))
+
+    ax1.get_xaxis().set_visible(False)
 
     fname = column.replace(" ", "_");
     fname = fname.replace("(", "");
@@ -324,7 +369,7 @@ def drawProfiles(objectives, colours, labels):
 
     #plt.yscale("log")
     #plt.ylim((ref.min(), ref.max()))
-    
+
     plt.xlabel("Distance (in $\mathrm{\mu}$m)");
     plt.ylabel("Linear attenuation coefficients (in cm$^{-1}$)");
 
@@ -356,9 +401,9 @@ drawProfiles(["FULL_REGISTRATION_SINOGRAM_PARTIAL_NORMALISED_RMSE"],
         ["g"],
         ["RMSE on sinogram\nwith normalisation"])
 
-drawScatterPlots(["FULL_REGISTRATION_SINOGRAM_PARTIAL_NORMALISED_RMSE", "FULL_REGISTRATION_SINOGRAM_PARTIAL_NORMALISED_DSSIM"],
-        ["green", "red"],
-        ["RMSE on sinogram with normalisation", "DSSIM on projections with normalisation"])
+drawScatterPlots(["FULL_REGISTRATION_SINOGRAM_PARTIAL_NORMALISED_RMSE", "FULL_REGISTRATION_SINOGRAM_PARTIAL_NORMALISED_DSSIM", "FULL_REGISTRATION_SINOGRAM_PARTIAL_NORMALISED_ZNCC"],
+        ["green", "red", "blue"],
+        ["RMSE on sinogram with normalisation", "DSSIM on projections with normalisation", "ZNCC on sinogram"])
 
 
 
@@ -564,7 +609,7 @@ for objective, label in zip(["FULL_REGISTRATION_SINOGRAM_PARTIAL_NORMALISED_RMSE
     ax1.set_xticks([])
     ax1.set_yticks([])
     ax1.axis('off')
-    
+
     i += 1;
 
 
@@ -656,7 +701,7 @@ for objective, label in zip(["FULL_REGISTRATION_SINOGRAM_PARTIAL_NORMALISED_RMSE
     ax1.set_xticks([])
     ax1.set_yticks([])
     ax1.axis('off')
-    
+
     i += 1;
 
 
