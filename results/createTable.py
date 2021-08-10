@@ -388,7 +388,7 @@ def drawProfiles(objectives, colours, labels):
             ref = np.diag(ground_truth[505 - offset:505 + offset + 1,501 - offset:501 + offset + 1])
             x = np.array(range(len(ref)))
             x = x - ((2+x[-1]) / 2)
-            x *= 1.9
+            x *= math.sqrt(2.0*1.9*1.9)
             plt.plot(x, ref, "k-", label="Real CT");
             ref_not_plotted = True;
 
@@ -406,7 +406,15 @@ def drawProfiles(objectives, colours, labels):
         plt.plot(x, sim, "-.", label="Best run for " + label, color="#ffa600");
 
     #plt.yscale("log")
-    plt.xlim((-55, 55))
+    x_extraticks = [-15.8/2, 15.8/2, -104.96 / 2, 104.96 / 2]
+    y_extraticks = [74, 74, 3.6, 3.6]
+    plt.xticks(list(plt.xticks()[0]) + x_extraticks)
+
+    for xtick, ytick in zip(x_extraticks, y_extraticks):
+        plt.vlines(x_extraticks, -80, y_extraticks, linestyles='dotted', colors='gray')
+
+    plt.xlim((-80, 80))
+    plt.ylim((-80, 190))
 
     plt.xlabel("Distance (in $\mathrm{\mu}$m)");
     plt.ylabel("Linear attenuation coefficients (in cm$^{-1}$)");
@@ -446,6 +454,7 @@ def drawScatterPlots(objectives, colours, labels):
     plt.savefig("scatter_plot.pdf");
 
 
+SMALLER_SIZE = 9
 SMALL_SIZE = 12
 MEDIUM_SIZE = 13
 BIGGER_SIZE = 14
@@ -453,8 +462,8 @@ BIGGER_SIZE = 14
 plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
 plt.rc('axes', titlesize=SMALL_SIZE)     # fontsize of the axes title
 plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
-plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
-plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+plt.rc('xtick', labelsize=SMALLER_SIZE)    # fontsize of the tick labels
+plt.rc('ytick', labelsize=SMALLER_SIZE)    # fontsize of the tick labels
 plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
@@ -463,8 +472,6 @@ drawProfiles(["FULL_REGISTRATION_SINOGRAM_PARTIAL_NORMALISED_RMSE"],
         ["g"],
         ["RMSE on $\mathbf{Sino}$\nwith normalisation"])
 
-plt.show()
-exit()
 
 print("********************************************************************************")
 print("Matrix")
@@ -641,9 +648,9 @@ print("\t", df["i"][idxmax], df[selection]["LAPLACIAN_LSF_ZNCC"].max())
 
 fig, axes = plt.subplots(nrows=1, ncols=3)
 
-SMALL_SIZE = 9
-MEDIUM_SIZE = 10
-BIGGER_SIZE = 11
+SMALL_SIZE = 5
+MEDIUM_SIZE = 6
+BIGGER_SIZE = 7
 
 plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
 plt.rc('axes', titlesize=SMALL_SIZE)     # fontsize of the axes title
