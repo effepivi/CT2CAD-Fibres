@@ -2084,6 +2084,14 @@ print("ZNCC phase contrast registration 1:",
       "{:.2f}".format(100.0 * np.mean(np.multiply(normalised_reference_CT, normalised_simulated_CT))));
 
 
+saveMHA(output_directory + "/simulated_CT_laplacian1.mha",
+        simulated_CT,
+        [pixel_spacing_in_mm, pixel_spacing_in_mm, pixel_spacing_in_mm]);
+
+saveMHA(output_directory + "/simulated_sinogram_laplacian1.mha",
+        simulated_sinogram,
+        [pixel_spacing_in_mm, angular_step, pixel_spacing_in_mm]);
+
 # ## Optimisation of the phase contrast and the LSF
 
 # In[ ]:
@@ -2178,18 +2186,18 @@ if os.path.isfile(output_directory + "/laplacian2.dat") and os.path.isfile(outpu
 
     temp = np.loadtxt(output_directory + "/lsf2.dat");
 
-    if temp.shape[0] == 4:
+    if temp.shape[0] == 6:
+        a2 = temp[0];
+        b2 = temp[1];
+        c2 = temp[2];
+        d2 = temp[3];
+        e2 = temp[4];
+        f2 = temp[5];
+    else:
         b2 = temp[0];
         c2 = temp[1];
         e2 = temp[2];
         f2 = temp[3];
-    elif temp.shape[0] == 6:
-        b2 = temp[1];
-        c2 = temp[2];
-        e2 = temp[3];
-        f2 = temp[4];
-    else:
-        raise "Cannot read " + output_directory + "/lsf2.dat"
 
 # Perform the registration using CMA-ES
 else:
@@ -2280,6 +2288,13 @@ lsf_kernel=lsf(t*41, b2, c2, e2, f2);
 lsf_kernel/=lsf_kernel.sum();
 np.savetxt(output_directory + "/LSF_optimised.txt", lsf_kernel);
 
+temp = []
+for x, y in zip(t, lsf_kernel):
+    x *= pixel_spacing_in_micrometre
+    temp.append([x, y])
+
+np.savetxt(output_directory + "/LSF_optimised-in-um.txt", temp);
+
 
 # In[ ]:
 
@@ -2288,6 +2303,18 @@ np.savetxt(output_directory + "/LSF_optimised.txt", lsf_kernel);
 sigma_set = [sigma_core, sigma_fibre, sigma_matrix];
 k_set = [k_core, k_fibre, k_matrix];
 label_set = ["core", "fibre", "matrix"];
+
+# Create the convolution filter
+pixel_range = np.linspace(-value_range, value_range, num=int(num_samples), endpoint=True)
+
+for label, k, sigma in zip(label_set, k_set, sigma_set):
+    kernel = k * laplacian(pixel_range, sigma);
+    temp = []
+    for x, y in zip(pixel_range, kernel):
+        x *= pixel_spacing_in_micrometre
+        temp.append([x, y])
+
+    np.savetxt(output_directory + "/" + label + "_laplacian-in-um.txt", temp);
 
 simulated_sinogram, normalised_projections, raw_projections_in_keV = simulateSinogram(sigma_set, k_set, label_set);
 
@@ -2300,6 +2327,14 @@ normalised_simulated_CT = (simulated_CT - simulated_CT.mean()) / simulated_CT.st
 print("ZNCC phase contrast and LSF registration:",
       "{:.2f}".format(100.0 * np.mean(np.multiply(normalised_reference_CT, normalised_simulated_CT))));
 
+
+saveMHA(output_directory + "/simulated_CT_LSF.mha",
+        simulated_CT,
+        [pixel_spacing_in_mm, pixel_spacing_in_mm, pixel_spacing_in_mm]);
+
+saveMHA(output_directory + "/simulated_sinogram_LSF.mha",
+        simulated_sinogram,
+        [pixel_spacing_in_mm, angular_step, pixel_spacing_in_mm]);
 
 # In[ ]:
 

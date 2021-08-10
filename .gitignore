@@ -31,6 +31,10 @@ registration-matrix-then-fibres2-SCW/runtime_*
 
 validation-high-tol/
 
+tutorial/plots/spectrum1_registration-*.png
+tutorial/plots/laplacian*_registration-*.png
+tutorial/plots/fibre*_registration-*.png
+tutorial/plots/cube*_registration-*.png
 
 results/CUBE1_RUNTIME_in_min.pdf
 results/FIBRE1_ZNCC.csv
