@@ -445,7 +445,7 @@ def drawScatterPlots(objectives, colours, labels):
 
 drawProfiles(["FULL_REGISTRATION_SINOGRAM_PARTIAL_NORMALISED_RMSE"],
         ["g"],
-        ["RMSE on sinogram\nwith normalisation"])
+        ["RMSE on $\mathbf{Sino}$\nwith normalisation"])
 
 
 
@@ -590,7 +590,7 @@ plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
 drawScatterPlots(["FULL_REGISTRATION_SINOGRAM_PARTIAL_NORMALISED_RMSE", "FULL_REGISTRATION_PROJS_PARTIAL_NORMALISED_DSSIM", "FULL_REGISTRATION_SINOGRAM_PARTIAL_NORMALISED_ZNCC"],
         ["#1b9e77", "#d95f02", "#7570b3"],
-        ["RMSE on sinogram with normalisation", "DSSIM on projections with normalisation", "ZNCC on sinogram"])
+        ["RMSE on $\mathbf{Sino}$ with normalisation", "DSSIM on $\mathbf{Proj}$ with normalisation", "ZNCC on $\mathbf{Sino}$"])
 
 
 
@@ -624,7 +624,19 @@ print("\t", df["i"][idxmax], df[selection]["LAPLACIAN_LSF_ZNCC"].max())
 
 fig, axes = plt.subplots(nrows=1, ncols=3)
 
-norm = cm.colors.Normalize(vmax=30, vmin=-20)
+SMALL_SIZE = 9
+MEDIUM_SIZE = 10
+BIGGER_SIZE = 11
+
+plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
+plt.rc('axes', titlesize=SMALL_SIZE)     # fontsize of the axes title
+plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
+plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
+plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+
+norm = cm.colors.Normalize(vmax=50, vmin=0)
 
 fname = objective + "/run_SCW_" + str(df["i"][idxmin]) + "/simulated_CT_before_noise.mha";
 simulated_CT = sitk.GetArrayFromImage(sitk.ReadImage(fname))
@@ -770,7 +782,20 @@ plt.savefig("checkerboard.pdf", dpi=600);
 offset = 30;
 fig, axes = plt.subplots(nrows=1, ncols=3)
 
-norm = cm.colors.Normalize(vmax=30, vmin=-20)
+SMALL_SIZE = 9
+MEDIUM_SIZE = 10
+BIGGER_SIZE = 11
+
+plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
+plt.rc('axes', titlesize=SMALL_SIZE)     # fontsize of the axes title
+plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
+plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
+plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+
+
+norm = cm.colors.Normalize(vmax=50, vmin=0)
 
 fname = objective + "/run_SCW_" + str(df["i"][idxmin]) + "/simulated_CT_before_noise.mha";
 simulated_CT = sitk.GetArrayFromImage(sitk.ReadImage(fname))[505 - offset:505 + offset + 1,501 - offset:501 + offset + 1]
