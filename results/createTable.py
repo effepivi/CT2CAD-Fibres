@@ -386,24 +386,27 @@ def drawProfiles(objectives, colours, labels):
             ground_truth = sitk.GetArrayFromImage(ref_CT)[0]
 
             ref = np.diag(ground_truth[505 - offset:505 + offset + 1,501 - offset:501 + offset + 1])
-            plt.plot(np.array(range(len(ref))) * 1.9, ref, "k-", label="Real CT");
+            x = np.array(range(len(ref)))
+            x = x - ((2+x[-1]) / 2)
+            x *= 1.9
+            plt.plot(x, ref, "k-", label="Real CT");
             ref_not_plotted = True;
 
         # Load simulated slice
         simulated_CT = sitk.ReadImage(objective + "/run_SCW_" + str(df["i"][idxmin]) + "/simulated_CT_before_noise.mha")
         sim = np.diag(sitk.GetArrayFromImage(simulated_CT)[505 - offset:505 + offset + 1,501 - offset:501 + offset + 1])
-        plt.plot(np.array(range(len(sim))) * 1.9, sim, "--", label="Worse run for " + label, color="#003f5c");
+        plt.plot(x, sim, "--", label="Worse run for " + label, color="#003f5c");
 
         simulated_CT = sitk.ReadImage(objective + "/run_SCW_" + str(df["i"][idxmedian]) + "/simulated_CT_before_noise.mha")
         sim = np.diag(sitk.GetArrayFromImage(simulated_CT)[505 - offset:505 + offset + 1,501 - offset:501 + offset + 1])
-        plt.plot(np.array(range(len(sim))) * 1.9, sim, ":", label="Median run for " + label, color="#bc5090");
+        plt.plot(x, sim, ":", label="Median run for " + label, color="#bc5090");
 
         simulated_CT = sitk.ReadImage(objective + "/run_SCW_" + str(df["i"][idxmax]) + "/simulated_CT_before_noise.mha")
         sim = np.diag(sitk.GetArrayFromImage(simulated_CT)[505 - offset:505 + offset + 1,501 - offset:501 + offset + 1])
-        plt.plot(np.array(range(len(sim))) * 1.9, sim, "-.", label="Best run for " + label, color="#ffa600");
+        plt.plot(x, sim, "-.", label="Best run for " + label, color="#ffa600");
 
     #plt.yscale("log")
-    #plt.ylim((ref.min(), ref.max()))
+    plt.xlim((-55, 55))
 
     plt.xlabel("Distance (in $\mathrm{\mu}$m)");
     plt.ylabel("Linear attenuation coefficients (in cm$^{-1}$)");
@@ -443,11 +446,25 @@ def drawScatterPlots(objectives, colours, labels):
     plt.savefig("scatter_plot.pdf");
 
 
+SMALL_SIZE = 12
+MEDIUM_SIZE = 13
+BIGGER_SIZE = 14
+
+plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
+plt.rc('axes', titlesize=SMALL_SIZE)     # fontsize of the axes title
+plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
+plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
+plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+
+
 drawProfiles(["FULL_REGISTRATION_SINOGRAM_PARTIAL_NORMALISED_RMSE"],
         ["g"],
         ["RMSE on $\mathbf{Sino}$\nwith normalisation"])
 
-
+plt.show()
+exit()
 
 print("********************************************************************************")
 print("Matrix")
