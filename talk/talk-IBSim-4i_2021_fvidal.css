@@ -1,6 +1,65 @@
-<style>
+body {background-color: blue;}
 
- body {background-color: blue;}
+#thumbs {   
+    width: 540px;
+    margin-top:90px;
+    margin-left: auto; 
+    margin-right: auto;
+
+     text-align: justify;
+    -ms-text-justify: distribute-all-lines;
+    text-justify: distribute-all-lines;
+}
+#thumbs a {
+    vertical-align: top;
+    display: inline-block;
+    *display: inline;
+    zoom: 1;
+}
+.stretch {
+    width: 100%;
+    display: inline-block;
+    font-size: 0;
+    line-height: 0
+}
+
+ .column {
+  float: left;
+  width: 50%;
+}
+
+/* Clear floats after the columns */
+.row:after {
+  content: "";
+  display: table;
+  clear: both;
+} 
+
+
+/*Some css fixes to use night theme with IPython slides
+body {
+background-color: #111111;
+}
+.reveal p {
+color: white;
+}
+.reveal ul, ol {
+color: white;
+}
+div.output_area pre {
+color: white;
+}
+div.output_stderr {
+background: #F00;
+}
+.reveal table th, .reveal table td {
+color: white;
+}
+
+*/
+
+
+
 
 .rendered_html
 {
@@ -123,5 +182,3 @@
 {
     padding-bottom: 0.5em;
 }
-
-</style>
